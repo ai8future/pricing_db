@@ -14,12 +14,15 @@ func ensureInitialized() {
 	initOnce.Do(func() {
 		defaultPricer, initErr = NewPricer()
 		if initErr != nil {
-			// Create empty pricer for graceful degradation
+			// Create empty pricer for graceful degradation.
+			// Callers should check InitError() to detect this condition.
 			defaultPricer = &Pricer{
-				models:    make(map[string]ModelPricing),
-				grounding: make(map[string]GroundingPricing),
-				credits:   make(map[string]*CreditPricing),
-				providers: make(map[string]ProviderPricing),
+				models:          make(map[string]ModelPricing),
+				modelKeysSorted: []string{},
+				grounding:       make(map[string]GroundingPricing),
+				groundingKeys:   []string{},
+				credits:         make(map[string]*CreditPricing),
+				providers:       make(map[string]ProviderPricing),
 			}
 		}
 	})
