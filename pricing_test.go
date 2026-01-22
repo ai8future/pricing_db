@@ -344,3 +344,61 @@ func TestGroqNotGrok(t *testing.T) {
 		t.Error("expected to find llama model in Groq")
 	}
 }
+
+func TestPrefixMatchBoundary(t *testing.T) {
+	p, err := NewPricer()
+	if err != nil {
+		t.Fatalf("NewPricer failed: %v", err)
+	}
+
+	// "gpt-4o" should NOT match a hypothetical "gpt-4" prefix
+	// because "o" is not a valid delimiter
+	// Test by checking that "gpt-4o-2024-08-06" matches "gpt-4o" (has hyphen delimiter)
+	pricing, ok := p.GetPricing("gpt-4o-2024-08-06")
+	if !ok {
+		t.Fatal("expected gpt-4o-2024-08-06 to match via prefix")
+	}
+	// Should get gpt-4o pricing, not gpt-4 pricing
+	// gpt-4o input is 2.5, gpt-4 input is 30.0
+	if !floatEquals(pricing.InputPerMillion, 2.5) {
+		t.Errorf("expected gpt-4o pricing (2.5), got %f", pricing.InputPerMillion)
+	}
+}
+
+func TestProviderNamespacing(t *testing.T) {
+	p, err := NewPricer()
+	if err != nil {
+		t.Fatalf("NewPricer failed: %v", err)
+	}
+
+	model := "deepseek-ai/DeepSeek-V3"
+
+	// DeepInfra
+	diKey := "deepinfra/" + model
+	diPrice, ok := p.GetPricing(diKey)
+	if !ok {
+		t.Fatalf("expected to find %q", diKey)
+	}
+
+	// Together
+	togKey := "together/" + model
+	togPrice, ok := p.GetPricing(togKey)
+	if !ok {
+		t.Fatalf("expected to find %q", togKey)
+	}
+
+	// Verify they are different
+	if floatEquals(diPrice.InputPerMillion, togPrice.InputPerMillion) {
+		t.Errorf("expected different input prices for %s and %s", diKey, togKey)
+	}
+
+	// Verify specific values (approximate checks based on known data)
+	// DeepInfra: ~$0.32
+	if !floatEquals(diPrice.InputPerMillion, 0.32) {
+		t.Errorf("unexpected DeepInfra price: %f", diPrice.InputPerMillion)
+	}
+	// Together: ~$1.25
+	if !floatEquals(togPrice.InputPerMillion, 1.25) {
+		t.Errorf("unexpected Together price: %f", togPrice.InputPerMillion)
+	}
+}

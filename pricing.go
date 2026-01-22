@@ -78,15 +78,23 @@ func NewPricerFromFS(fsys fs.FS, dir string) (*Pricer, error) {
 				return nil, err
 			}
 			models[model] = pricing
+			// Also add provider-namespaced key for disambiguation
+			models[providerName+"/"+model] = pricing
 		}
 
-		// Merge grounding pricing
+		// Merge grounding pricing (with validation)
 		for prefix, pricing := range file.Grounding {
+			if err := validateGroundingPricing(prefix, pricing, entry.Name()); err != nil {
+				return nil, err
+			}
 			grounding[prefix] = pricing
 		}
 
-		// Store credit pricing
+		// Store credit pricing (with validation)
 		if file.CreditPricing != nil {
+			if err := validateCreditPricing(file.CreditPricing, entry.Name()); err != nil {
+				return nil, err
+			}
 			credits[providerName] = file.CreditPricing
 		}
 	}
@@ -96,21 +104,8 @@ func NewPricerFromFS(fsys fs.FS, dir string) (*Pricer, error) {
 	}
 
 	// Build sorted keys for deterministic prefix matching (longest first)
-	modelKeys := make([]string, 0, len(models))
-	for k := range models {
-		modelKeys = append(modelKeys, k)
-	}
-	sort.Slice(modelKeys, func(i, j int) bool {
-		return len(modelKeys[i]) > len(modelKeys[j])
-	})
-
-	groundingKeys := make([]string, 0, len(grounding))
-	for k := range grounding {
-		groundingKeys = append(groundingKeys, k)
-	}
-	sort.Slice(groundingKeys, func(i, j int) bool {
-		return len(groundingKeys[i]) > len(groundingKeys[j])
-	})
+	modelKeys := sortedKeysByLengthDesc(models)
+	groundingKeys := sortedKeysByLengthDesc(grounding)
 
 	return &Pricer{
 		models:          models,
@@ -123,6 +118,9 @@ func NewPricerFromFS(fsys fs.FS, dir string) (*Pricer, error) {
 }
 
 // Calculate computes the cost for token-based models.
+// If an exact model match is not found, prefix matching is used to support
+// versioned model names (e.g., "gpt-4o-2024-08-06" matches "gpt-4o").
+// The longest matching prefix is used for deterministic results.
 func (p *Pricer) Calculate(model string, inputTokens, outputTokens int64) Cost {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -154,7 +152,7 @@ func (p *Pricer) Calculate(model string, inputTokens, outputTokens int64) Cost {
 // Uses sorted keys (longest first) for deterministic matching.
 func (p *Pricer) findPricingByPrefix(model string) (ModelPricing, bool) {
 	for _, knownModel := range p.modelKeysSorted {
-		if strings.HasPrefix(model, knownModel) {
+		if strings.HasPrefix(model, knownModel) && isValidPrefixMatch(model, knownModel) {
 			return p.models[knownModel], true
 		}
 	}
@@ -175,7 +173,7 @@ func (p *Pricer) CalculateGrounding(model string, queryCount int) float64 {
 
 	// Find matching rate by prefix (longest match first)
 	for _, prefix := range p.groundingKeys {
-		if strings.HasPrefix(model, prefix) {
+		if strings.HasPrefix(model, prefix) && isValidPrefixMatch(model, prefix) {
 			pricing := p.grounding[prefix]
 			return float64(queryCount) * pricing.PerThousandQueries / 1000.0
 		}
@@ -229,7 +227,7 @@ func (p *Pricer) GetProviderMetadata(provider string) (ProviderPricing, bool) {
 	return pp, ok
 }
 
-// ListProviders returns all loaded provider names.
+// ListProviders returns all loaded provider names in alphabetical order.
 func (p *Pricer) ListProviders() []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -237,6 +235,7 @@ func (p *Pricer) ListProviders() []string {
 	for name := range p.providers {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 
@@ -254,6 +253,29 @@ func (p *Pricer) ProviderCount() int {
 	return len(p.providers)
 }
 
+// isValidPrefixMatch ensures prefix match ends at a valid boundary.
+// Valid boundaries are: end of string, or delimiter (-, _, /, .)
+func isValidPrefixMatch(model, prefix string) bool {
+	if len(model) == len(prefix) {
+		return true // exact match
+	}
+	nextChar := model[len(prefix)]
+	return nextChar == '-' || nextChar == '_' || nextChar == '/' || nextChar == '.'
+}
+
+// sortedKeysByLengthDesc returns map keys sorted by length descending.
+// Used for deterministic prefix matching (longest match first).
+func sortedKeysByLengthDesc[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return len(keys[i]) > len(keys[j])
+	})
+	return keys
+}
+
 // validateModelPricing checks for invalid pricing values.
 func validateModelPricing(model string, pricing ModelPricing, filename string) error {
 	if pricing.InputPerMillion < 0 {
@@ -269,6 +291,31 @@ func validateModelPricing(model string, pricing ModelPricing, filename string) e
 	}
 	if pricing.OutputPerMillion > maxReasonablePrice {
 		return fmt.Errorf("%s: model %q has suspiciously high output price: %f (max %f)", filename, model, pricing.OutputPerMillion, maxReasonablePrice)
+	}
+	return nil
+}
+
+// validateGroundingPricing checks for invalid grounding pricing values.
+func validateGroundingPricing(prefix string, pricing GroundingPricing, filename string) error {
+	if pricing.PerThousandQueries < 0 {
+		return fmt.Errorf("%s: grounding prefix %q has negative price: %f", filename, prefix, pricing.PerThousandQueries)
+	}
+	return nil
+}
+
+// validateCreditPricing checks for invalid credit pricing values.
+func validateCreditPricing(pricing *CreditPricing, filename string) error {
+	if pricing.BaseCostPerRequest < 0 {
+		return fmt.Errorf("%s: credit pricing has negative base cost: %d", filename, pricing.BaseCostPerRequest)
+	}
+	if pricing.Multipliers.JSRendering < 0 {
+		return fmt.Errorf("%s: credit pricing has negative js_rendering multiplier: %d", filename, pricing.Multipliers.JSRendering)
+	}
+	if pricing.Multipliers.PremiumProxy < 0 {
+		return fmt.Errorf("%s: credit pricing has negative premium_proxy multiplier: %d", filename, pricing.Multipliers.PremiumProxy)
+	}
+	if pricing.Multipliers.JSPremium < 0 {
+		return fmt.Errorf("%s: credit pricing has negative js_premium multiplier: %d", filename, pricing.Multipliers.JSPremium)
 	}
 	return nil
 }
