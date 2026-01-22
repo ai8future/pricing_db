@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -11,11 +12,13 @@ import (
 // Pricer calculates costs across all providers.
 // Thread-safe with RWMutex for concurrent access.
 type Pricer struct {
-	models    map[string]ModelPricing
-	grounding map[string]GroundingPricing
-	credits   map[string]*CreditPricing
-	providers map[string]ProviderPricing
-	mu        sync.RWMutex
+	models          map[string]ModelPricing
+	modelKeysSorted []string // sorted by length descending for prefix matching
+	grounding       map[string]GroundingPricing
+	groundingKeys   []string // sorted by length descending for prefix matching
+	credits         map[string]*CreditPricing
+	providers       map[string]ProviderPricing
+	mu              sync.RWMutex
 }
 
 // NewPricer creates a new Pricer from embedded configs.
@@ -69,8 +72,11 @@ func NewPricerFromFS(fsys fs.FS, dir string) (*Pricer, error) {
 			Metadata:          file.Metadata,
 		}
 
-		// Merge models into flat lookup
+		// Merge models into flat lookup (with validation)
 		for model, pricing := range file.Models {
+			if err := validateModelPricing(model, pricing, entry.Name()); err != nil {
+				return nil, err
+			}
 			models[model] = pricing
 		}
 
@@ -89,11 +95,30 @@ func NewPricerFromFS(fsys fs.FS, dir string) (*Pricer, error) {
 		return nil, fmt.Errorf("no pricing files found in %s", dir)
 	}
 
+	// Build sorted keys for deterministic prefix matching (longest first)
+	modelKeys := make([]string, 0, len(models))
+	for k := range models {
+		modelKeys = append(modelKeys, k)
+	}
+	sort.Slice(modelKeys, func(i, j int) bool {
+		return len(modelKeys[i]) > len(modelKeys[j])
+	})
+
+	groundingKeys := make([]string, 0, len(grounding))
+	for k := range grounding {
+		groundingKeys = append(groundingKeys, k)
+	}
+	sort.Slice(groundingKeys, func(i, j int) bool {
+		return len(groundingKeys[i]) > len(groundingKeys[j])
+	})
+
 	return &Pricer{
-		models:    models,
-		grounding: grounding,
-		credits:   credits,
-		providers: providers,
+		models:          models,
+		modelKeysSorted: modelKeys,
+		grounding:       grounding,
+		groundingKeys:   groundingKeys,
+		credits:         credits,
+		providers:       providers,
 	}, nil
 }
 
@@ -126,10 +151,11 @@ func (p *Pricer) Calculate(model string, inputTokens, outputTokens int64) Cost {
 
 // findPricingByPrefix finds pricing for models with version suffixes.
 // E.g., "gpt-4o-2024-08-06" matches "gpt-4o"
+// Uses sorted keys (longest first) for deterministic matching.
 func (p *Pricer) findPricingByPrefix(model string) (ModelPricing, bool) {
-	for knownModel, pricing := range p.models {
+	for _, knownModel := range p.modelKeysSorted {
 		if strings.HasPrefix(model, knownModel) {
-			return pricing, true
+			return p.models[knownModel], true
 		}
 	}
 	return ModelPricing{}, false
@@ -138,6 +164,7 @@ func (p *Pricer) findPricingByPrefix(model string) (ModelPricing, bool) {
 // CalculateGrounding computes the cost for Google grounding/search.
 // For Gemini 3: queryCount is the actual number of search queries.
 // For Gemini 2.5 and older: queryCount should be 1 if grounding was used.
+// Uses sorted keys (longest first) for deterministic matching.
 func (p *Pricer) CalculateGrounding(model string, queryCount int) float64 {
 	if queryCount <= 0 {
 		return 0
@@ -146,9 +173,10 @@ func (p *Pricer) CalculateGrounding(model string, queryCount int) float64 {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	// Find matching rate by prefix
-	for prefix, pricing := range p.grounding {
+	// Find matching rate by prefix (longest match first)
+	for _, prefix := range p.groundingKeys {
 		if strings.HasPrefix(model, prefix) {
+			pricing := p.grounding[prefix]
 			return float64(queryCount) * pricing.PerThousandQueries / 1000.0
 		}
 	}
@@ -224,4 +252,23 @@ func (p *Pricer) ProviderCount() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return len(p.providers)
+}
+
+// validateModelPricing checks for invalid pricing values.
+func validateModelPricing(model string, pricing ModelPricing, filename string) error {
+	if pricing.InputPerMillion < 0 {
+		return fmt.Errorf("%s: model %q has negative input price: %f", filename, model, pricing.InputPerMillion)
+	}
+	if pricing.OutputPerMillion < 0 {
+		return fmt.Errorf("%s: model %q has negative output price: %f", filename, model, pricing.OutputPerMillion)
+	}
+	// Sanity check: prices above $10,000/million are likely typos
+	const maxReasonablePrice = 10000.0
+	if pricing.InputPerMillion > maxReasonablePrice {
+		return fmt.Errorf("%s: model %q has suspiciously high input price: %f (max %f)", filename, model, pricing.InputPerMillion, maxReasonablePrice)
+	}
+	if pricing.OutputPerMillion > maxReasonablePrice {
+		return fmt.Errorf("%s: model %q has suspiciously high output price: %f (max %f)", filename, model, pricing.OutputPerMillion, maxReasonablePrice)
+	}
+	return nil
 }

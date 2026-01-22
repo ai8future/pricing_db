@@ -84,3 +84,11 @@ func DefaultPricer() *Pricer {
 	ensureInitialized()
 	return defaultPricer
 }
+
+// InitError returns any error that occurred during initialization
+// of the default pricer. Returns nil if initialization succeeded.
+// Call this to check if the package-level functions are working correctly.
+func InitError() error {
+	ensureInitialized()
+	return initErr
+}

@@ -1,8 +1,15 @@
 package pricing_db
 
 import (
+	"math"
 	"testing"
 )
+
+const floatEpsilon = 1e-9
+
+func floatEquals(a, b float64) bool {
+	return math.Abs(a-b) < floatEpsilon
+}
 
 func TestNewPricer(t *testing.T) {
 	p, err := NewPricer()
@@ -31,13 +38,13 @@ func TestCalculate(t *testing.T) {
 	// Input: 1000 tokens * $2.50/1M = $0.0025
 	// Output: 500 tokens * $10.00/1M = $0.005
 	// Total: $0.0075
-	if cost.InputCost != 0.0025 {
+	if !floatEquals(cost.InputCost, 0.0025) {
 		t.Errorf("expected input cost 0.0025, got %f", cost.InputCost)
 	}
-	if cost.OutputCost != 0.005 {
+	if !floatEquals(cost.OutputCost, 0.005) {
 		t.Errorf("expected output cost 0.005, got %f", cost.OutputCost)
 	}
-	if cost.TotalCost != 0.0075 {
+	if !floatEquals(cost.TotalCost, 0.0075) {
 		t.Errorf("expected total cost 0.0075, got %f", cost.TotalCost)
 	}
 	if cost.Unknown {
@@ -53,7 +60,7 @@ func TestCalculate_UnknownModel(t *testing.T) {
 
 	cost := p.Calculate("unknown-model-xyz", 1000, 500)
 
-	if cost.TotalCost != 0 {
+	if !floatEquals(cost.TotalCost, 0) {
 		t.Errorf("expected 0 cost for unknown model, got %f", cost.TotalCost)
 	}
 	if !cost.Unknown {
@@ -74,7 +81,7 @@ func TestCalculate_PrefixMatch(t *testing.T) {
 		t.Error("expected versioned model to match via prefix")
 	}
 	// 1M input * $2.50/1M = $2.50
-	if cost.InputCost != 2.5 {
+	if !floatEquals(cost.InputCost, 2.5) {
 		t.Errorf("expected input cost 2.5, got %f", cost.InputCost)
 	}
 }
@@ -88,14 +95,14 @@ func TestCalculateGrounding(t *testing.T) {
 	// Gemini 3: $14/1000 queries
 	cost := p.CalculateGrounding("gemini-3-pro-preview", 5)
 	expected := 5 * 14.0 / 1000.0 // $0.07
-	if cost != expected {
+	if !floatEquals(cost, expected) {
 		t.Errorf("expected grounding cost %f, got %f", expected, cost)
 	}
 
 	// Gemini 2.5: $35/1000 prompts
 	cost2 := p.CalculateGrounding("gemini-2.5-pro", 1)
 	expected2 := 35.0 / 1000.0 // $0.035
-	if cost2 != expected2 {
+	if !floatEquals(cost2, expected2) {
 		t.Errorf("expected grounding cost %f, got %f", expected2, cost2)
 	}
 }
@@ -196,10 +203,10 @@ func TestGetPricing(t *testing.T) {
 	}
 
 	// Verify corrected pricing: $1.00/$5.00 (not $0.80/$4.00)
-	if pricing.InputPerMillion != 1.0 {
+	if !floatEquals(pricing.InputPerMillion, 1.0) {
 		t.Errorf("expected input price 1.0, got %f", pricing.InputPerMillion)
 	}
-	if pricing.OutputPerMillion != 5.0 {
+	if !floatEquals(pricing.OutputPerMillion, 5.0) {
 		t.Errorf("expected output price 5.0, got %f", pricing.OutputPerMillion)
 	}
 }
@@ -216,10 +223,10 @@ func TestO3MiniPricing(t *testing.T) {
 	}
 
 	// Verify corrected pricing: $2.00/$8.00 (not $1.10/$4.40)
-	if pricing.InputPerMillion != 2.0 {
+	if !floatEquals(pricing.InputPerMillion, 2.0) {
 		t.Errorf("expected input price 2.0, got %f", pricing.InputPerMillion)
 	}
-	if pricing.OutputPerMillion != 8.0 {
+	if !floatEquals(pricing.OutputPerMillion, 8.0) {
 		t.Errorf("expected output price 8.0, got %f", pricing.OutputPerMillion)
 	}
 }
@@ -235,7 +242,7 @@ func TestXAIPricing(t *testing.T) {
 	if !ok {
 		t.Fatal("expected to find grok-2 pricing")
 	}
-	if pricing.InputPerMillion != 2.0 || pricing.OutputPerMillion != 10.0 {
+	if !floatEquals(pricing.InputPerMillion, 2.0) || !floatEquals(pricing.OutputPerMillion, 10.0) {
 		t.Errorf("grok-2 pricing incorrect: got %f/%f", pricing.InputPerMillion, pricing.OutputPerMillion)
 	}
 
@@ -244,7 +251,7 @@ func TestXAIPricing(t *testing.T) {
 	if !ok {
 		t.Fatal("expected to find grok-4 pricing")
 	}
-	if pricing4.InputPerMillion != 3.0 || pricing4.OutputPerMillion != 15.0 {
+	if !floatEquals(pricing4.InputPerMillion, 3.0) || !floatEquals(pricing4.OutputPerMillion, 15.0) {
 		t.Errorf("grok-4 pricing incorrect: got %f/%f", pricing4.InputPerMillion, pricing4.OutputPerMillion)
 	}
 }
@@ -252,13 +259,13 @@ func TestXAIPricing(t *testing.T) {
 func TestPackageLevelFunctions(t *testing.T) {
 	// Test CalculateCost
 	cost := CalculateCost("gpt-4o", 1000, 500)
-	if cost != 0.0075 {
+	if !floatEquals(cost, 0.0075) {
 		t.Errorf("expected 0.0075, got %f", cost)
 	}
 
 	// Test CalculateGroundingCost
 	grounding := CalculateGroundingCost("gemini-3-pro", 5)
-	if grounding != 0.07 {
+	if !floatEquals(grounding, 0.07) {
 		t.Errorf("expected 0.07, got %f", grounding)
 	}
 

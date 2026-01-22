@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 2026-01-22
+
+### Fixed
+- Prefix matching now deterministic (longest match first) - fixes potential billing errors
+- Added InitError() to expose initialization failures
+- Added JSON validation for pricing values (rejects negative/extreme prices)
+- Test comparisons now use epsilon for floating-point reliability
+
+---
+Agent: Claude:Opus 4.5
+
 ## [1.0.1] - 2026-01-22
 
 ### Changed
