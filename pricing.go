@@ -220,11 +220,15 @@ func (p *Pricer) GetPricing(model string) (ModelPricing, bool) {
 }
 
 // GetProviderMetadata returns metadata for a provider.
+// Returns a deep copy to prevent mutation of internal state.
 func (p *Pricer) GetProviderMetadata(provider string) (ProviderPricing, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	pp, ok := p.providers[provider]
-	return pp, ok
+	if !ok {
+		return ProviderPricing{}, false
+	}
+	return copyProviderPricing(pp), true
 }
 
 // ListProviders returns all loaded provider names in alphabetical order.
@@ -318,4 +322,46 @@ func validateCreditPricing(pricing *CreditPricing, filename string) error {
 		return fmt.Errorf("%s: credit pricing has negative js_premium multiplier: %d", filename, pricing.Multipliers.JSPremium)
 	}
 	return nil
+}
+
+// copyProviderPricing returns a deep copy of ProviderPricing.
+// Prevents callers from mutating internal state.
+func copyProviderPricing(pp ProviderPricing) ProviderPricing {
+	result := pp
+
+	if pp.Models != nil {
+		result.Models = make(map[string]ModelPricing, len(pp.Models))
+		for k, v := range pp.Models {
+			result.Models[k] = v
+		}
+	}
+
+	if pp.Grounding != nil {
+		result.Grounding = make(map[string]GroundingPricing, len(pp.Grounding))
+		for k, v := range pp.Grounding {
+			result.Grounding[k] = v
+		}
+	}
+
+	if pp.SubscriptionTiers != nil {
+		result.SubscriptionTiers = make(map[string]SubscriptionTier, len(pp.SubscriptionTiers))
+		for k, v := range pp.SubscriptionTiers {
+			result.SubscriptionTiers[k] = v
+		}
+	}
+
+	if pp.CreditPricing != nil {
+		cp := *pp.CreditPricing
+		result.CreditPricing = &cp
+	}
+
+	if len(pp.Metadata.SourceURLs) > 0 {
+		result.Metadata.SourceURLs = append([]string(nil), pp.Metadata.SourceURLs...)
+	}
+
+	if len(pp.Metadata.Notes) > 0 {
+		result.Metadata.Notes = append([]string(nil), pp.Metadata.Notes...)
+	}
+
+	return result
 }
