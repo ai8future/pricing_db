@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2026-01-22
+
+### Changed
+- Version bump to 1.0.1 for stable release
+
+---
+Agent: Claude:Opus 4.5
+
 ## [0.1.0] - 2026-01-22
 
 ### Added
