@@ -1,0 +1,61 @@
+{
+  "provider": "google",
+  "billing_type": "token",
+  "models": {
+    "gemini-3-pro-preview": {
+      "input_per_million": 2.0,
+      "output_per_million": 12.0
+    },
+    "gemini-3-flash": {
+      "input_per_million": 0.5,
+      "output_per_million": 3.0
+    },
+    "gemini-2.5-pro": {
+      "input_per_million": 1.25,
+      "output_per_million": 10.0
+    },
+    "gemini-2.5-flash": {
+      "input_per_million": 0.075,
+      "output_per_million": 0.3
+    },
+    "gemini-2.0-flash": {
+      "input_per_million": 0.1,
+      "output_per_million": 0.4
+    },
+    "gemini-2.0-flash-lite": {
+      "input_per_million": 0.075,
+      "output_per_million": 0.3
+    },
+    "gemini-1.5-pro": {
+      "input_per_million": 1.25,
+      "output_per_million": 5.0
+    },
+    "gemini-1.5-flash": {
+      "input_per_million": 0.075,
+      "output_per_million": 0.3
+    }
+  },
+  "grounding": {
+    "gemini-3": {
+      "per_thousand_queries": 14.0,
+      "billing_model": "per_query"
+    },
+    "gemini-2.5": {
+      "per_thousand_queries": 35.0,
+      "billing_model": "per_prompt"
+    },
+    "gemini-2.0": {
+      "per_thousand_queries": 35.0,
+      "billing_model": "per_prompt"
+    },
+    "gemini-1.5": {
+      "per_thousand_queries": 35.0,
+      "billing_model": "per_prompt"
+    }
+  },
+  "metadata": {
+    "updated": "2026-01-22",
+    "source_urls": ["https://ai.google.dev/pricing"],
+    "notes": ["Gemini 3 charges per search query executed", "Gemini 2.5 and older charge per grounded prompt"]
+  }
+}

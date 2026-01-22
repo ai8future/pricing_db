@@ -1,0 +1,34 @@
+{
+  "provider": "scrapedo",
+  "billing_type": "credit",
+  "credit_pricing": {
+    "base_cost_per_request": 1,
+    "multipliers": {
+      "js_rendering": 5,
+      "premium_proxy": 10,
+      "js_premium": 25
+    }
+  },
+  "subscription_tiers": {
+    "free": {
+      "credits": 1000,
+      "price_usd": 0
+    },
+    "hobby": {
+      "credits": 250000,
+      "price_usd": 29
+    },
+    "pro": {
+      "credits": 1250000,
+      "price_usd": 99
+    },
+    "business": {
+      "credits": 3000000,
+      "price_usd": 199
+    }
+  },
+  "metadata": {
+    "updated": "2026-01-22",
+    "source_urls": ["https://scrape.do/pricing"]
+  }
+}
