@@ -287,6 +287,15 @@ func (p *Pricer) CalculateCredit(provider, multiplier string) int {
 //   - For "stack" rule: cache and batch discounts multiply (Anthropic/OpenAI)
 //   - For "cache_precedence" rule: cached tokens use cache rate only, batch applies to non-cached (Gemini)
 //   - Grounding is excluded in batch mode if batch_grounding_ok is false
+//
+// IMPORTANT: Grounding in batch mode
+//
+//	When batch_grounding_ok is false (default for Gemini) and groundingQueries > 0:
+//	- The returned TotalCost EXCLUDES grounding cost
+//	- A warning is added to CostDetails.Warnings
+//	- Callers MUST check Warnings if grounding accuracy matters
+//	- In production, Gemini batch API rejects requests with grounding enabled
+//	This behavior allows cost estimation while flagging the configuration issue.
 func (p *Pricer) CalculateGeminiUsage(
 	model string,
 	metadata GeminiUsageMetadata,
