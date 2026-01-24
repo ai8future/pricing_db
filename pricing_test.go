@@ -1131,9 +1131,9 @@ func TestFullGeminiExample(t *testing.T) {
 	}
 
 	// Total should be approximately $0.0984
-	// Note: TotalCost is rounded to 6 decimal places, so we need to round expectedTotal for comparison
+	// Note: TotalCost is rounded to 9 decimal places, so we need to round expectedTotal for comparison
 	expectedTotal := expectedStandardInput + expectedCachedInput + expectedOutput + expectedThinking + expectedGrounding
-	expectedTotalRounded := roundToPrecision(expectedTotal, 6)
+	expectedTotalRounded := roundToPrecision(expectedTotal, 9)
 	if !floatEquals(cost.TotalCost, expectedTotalRounded) {
 		t.Errorf("total: expected %f, got %f", expectedTotalRounded, cost.TotalCost)
 	}
@@ -2224,12 +2224,12 @@ func TestFloatPrecisionRounding_InCostCalculation(t *testing.T) {
 	// Calculate a cost and verify it's properly rounded
 	cost := p.Calculate("gpt-4o", 1, 1) // Very small values
 
-	// TotalCost should have at most 6 decimal places of precision
-	// Multiply by 1e6 and check it's a whole number (or very close)
-	scaled := cost.TotalCost * 1_000_000
+	// TotalCost should have at most 9 decimal places of precision
+	// Multiply by 1e9 and check it's a whole number (or very close)
+	scaled := cost.TotalCost * 1_000_000_000
 	rounded := math.Round(scaled)
-	if math.Abs(scaled-rounded) > 1e-9 {
-		t.Errorf("TotalCost %v doesn't appear to be rounded to 6 decimal places", cost.TotalCost)
+	if math.Abs(scaled-rounded) > 1e-6 {
+		t.Errorf("TotalCost %v doesn't appear to be rounded to 9 decimal places", cost.TotalCost)
 	}
 }
 
@@ -2774,5 +2774,67 @@ func TestCalculateWithOptions_NegativeTokens(t *testing.T) {
 				t.Errorf("TotalCost should not be negative, got %f", cost.TotalCost)
 			}
 		})
+	}
+}
+
+// =============================================================================
+// Credit-Based Provider Tests (Postmark, Serper)
+// =============================================================================
+
+func TestPostmarkPricing(t *testing.T) {
+	p, err := NewPricer()
+	if err != nil {
+		t.Fatalf("NewPricer failed: %v", err)
+	}
+
+	// Verify provider loaded
+	meta, ok := p.GetProviderMetadata("postmark")
+	if !ok {
+		t.Fatal("expected postmark provider to be loaded")
+	}
+	if meta.BillingType != "credit" {
+		t.Errorf("expected billing_type 'credit', got %q", meta.BillingType)
+	}
+
+	// Verify credit calculation
+	cost := p.CalculateCredit("postmark", "base")
+	if cost != 1 {
+		t.Errorf("expected base cost 1, got %d", cost)
+	}
+
+	// Verify subscription tiers exist
+	if len(meta.SubscriptionTiers) == 0 {
+		t.Error("expected subscription tiers")
+	}
+}
+
+func TestSerperPricing(t *testing.T) {
+	p, err := NewPricer()
+	if err != nil {
+		t.Fatalf("NewPricer failed: %v", err)
+	}
+
+	// Verify provider loaded
+	meta, ok := p.GetProviderMetadata("serper")
+	if !ok {
+		t.Fatal("expected serper provider to be loaded")
+	}
+	if meta.BillingType != "credit" {
+		t.Errorf("expected billing_type 'credit', got %q", meta.BillingType)
+	}
+
+	// Verify credit calculation
+	cost := p.CalculateCredit("serper", "base")
+	if cost != 1 {
+		t.Errorf("expected base cost 1, got %d", cost)
+	}
+
+	// Verify subscription tiers
+	tier, ok := meta.SubscriptionTiers["12.5m"]
+	if !ok {
+		t.Fatal("expected 12.5m tier")
+	}
+	if tier.Credits != 12500000 {
+		t.Errorf("expected 12.5m credits, got %d", tier.Credits)
 	}
 }

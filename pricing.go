@@ -18,8 +18,8 @@ const defaultCacheMultiplier = 0.10
 const TokensPerMillion = 1_000_000.0
 
 // costPrecision defines the number of decimal places for cost rounding.
-// 6 decimal places = micro-cents, sufficient for sub-cent precision.
-const costPrecision = 6
+// 9 decimal places = nano-cents, sufficient for very low per-request costs.
+const costPrecision = 9
 
 // addInt64Safe adds two int64 values with overflow protection.
 // Returns the result and a boolean indicating if overflow occurred.

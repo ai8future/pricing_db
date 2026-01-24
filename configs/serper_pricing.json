@@ -1,0 +1,25 @@
+{
+  "provider": "serper",
+  "billing_type": "credit",
+  "credit_pricing": {
+    "base_cost_per_request": 1,
+    "multipliers": {}
+  },
+  "subscription_tiers": {
+    "free": { "credits": 2500, "price_usd": 0 },
+    "50k": { "credits": 50000, "price_usd": 50 },
+    "500k": { "credits": 500000, "price_usd": 375 },
+    "2.5m": { "credits": 2500000, "price_usd": 1250 },
+    "12.5m": { "credits": 12500000, "price_usd": 3750 }
+  },
+  "metadata": {
+    "updated": "2026-01-24",
+    "source_urls": ["https://serper.dev/"],
+    "notes": [
+      "1 credit = 1 search query",
+      "Credits valid for 6 months",
+      "Real-time results in 1-2 seconds",
+      "Up to 300 queries/second"
+    ]
+  }
+}

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.3] - 2026-01-24
+
+### Added
+- Postmark provider (transactional email API, credit-based billing)
+- Serper.dev provider (Google Search API, credit-based billing)
+
+### Changed
+- Increased cost precision from 6 to 9 decimal places (nano-cents) to support very low per-request costs
+
+---
+Agent: Claude:Opus 4.5
+
 ## [1.0.2] - 2026-01-22
 
 ### Fixed

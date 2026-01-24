@@ -1,0 +1,27 @@
+{
+  "provider": "postmark",
+  "billing_type": "credit",
+  "credit_pricing": {
+    "base_cost_per_request": 1,
+    "multipliers": {}
+  },
+  "subscription_tiers": {
+    "free": { "credits": 100, "price_usd": 0 },
+    "10k": { "credits": 10000, "price_usd": 15 },
+    "50k": { "credits": 50000, "price_usd": 50 },
+    "125k": { "credits": 125000, "price_usd": 100 },
+    "300k": { "credits": 300000, "price_usd": 200 },
+    "700k": { "credits": 700000, "price_usd": 400 },
+    "1.5m": { "credits": 1500000, "price_usd": 700 },
+    "3m": { "credits": 3000000, "price_usd": 1200 }
+  },
+  "metadata": {
+    "updated": "2026-01-24",
+    "source_urls": ["https://postmarkapp.com/pricing"],
+    "notes": [
+      "1 credit = 1 email sent",
+      "Overage rate: ~$1.25-1.80 per 1,000 emails depending on plan",
+      "All plans include full API features"
+    ]
+  }
+}
