@@ -177,6 +177,14 @@ func (p *Pricer) Calculate(model string, inputTokens, outputTokens int64) Cost {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
+	// Clamp negative tokens to 0
+	if inputTokens < 0 {
+		inputTokens = 0
+	}
+	if outputTokens < 0 {
+		outputTokens = 0
+	}
+
 	pricing, ok := p.models[model]
 	if !ok {
 		// Try prefix match for versioned models
@@ -394,6 +402,17 @@ func (p *Pricer) CalculateGeminiUsage(
 func (p *Pricer) CalculateWithOptions(model string, inputTokens, outputTokens, cachedTokens int64, opts *CalculateOptions) CostDetails {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+
+	// Clamp negative tokens to 0
+	if inputTokens < 0 {
+		inputTokens = 0
+	}
+	if outputTokens < 0 {
+		outputTokens = 0
+	}
+	if cachedTokens < 0 {
+		cachedTokens = 0
+	}
 
 	pricing, ok := p.models[model]
 	if !ok {

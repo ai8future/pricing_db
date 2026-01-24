@@ -2700,3 +2700,79 @@ func TestNegativeJSRenderingMultiplier(t *testing.T) {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }
+
+// =============================================================================
+// Negative Token Count Tests
+// =============================================================================
+
+func TestCalculate_NegativeTokens(t *testing.T) {
+	p, err := NewPricer()
+	if err != nil {
+		t.Fatalf("NewPricer failed: %v", err)
+	}
+
+	tests := []struct {
+		name         string
+		inputTokens  int64
+		outputTokens int64
+	}{
+		{"negative input", -100, 100},
+		{"negative output", 100, -100},
+		{"both negative", -100, -100},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cost := p.Calculate("gpt-4o", tc.inputTokens, tc.outputTokens)
+
+			// Negative tokens should be clamped to 0
+			if cost.InputCost < 0 {
+				t.Errorf("InputCost should not be negative, got %f", cost.InputCost)
+			}
+			if cost.OutputCost < 0 {
+				t.Errorf("OutputCost should not be negative, got %f", cost.OutputCost)
+			}
+			if cost.TotalCost < 0 {
+				t.Errorf("TotalCost should not be negative, got %f", cost.TotalCost)
+			}
+		})
+	}
+}
+
+func TestCalculateWithOptions_NegativeTokens(t *testing.T) {
+	p, err := NewPricer()
+	if err != nil {
+		t.Fatalf("NewPricer failed: %v", err)
+	}
+
+	tests := []struct {
+		name         string
+		inputTokens  int64
+		outputTokens int64
+		cachedTokens int64
+	}{
+		{"negative input", -100, 100, 0},
+		{"negative output", 100, -100, 0},
+		{"negative cached", 100, 100, -50},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cost := p.CalculateWithOptions("gpt-4o", tc.inputTokens, tc.outputTokens, tc.cachedTokens, nil)
+
+			// All costs should be non-negative
+			if cost.StandardInputCost < 0 {
+				t.Errorf("StandardInputCost should not be negative, got %f", cost.StandardInputCost)
+			}
+			if cost.CachedInputCost < 0 {
+				t.Errorf("CachedInputCost should not be negative, got %f", cost.CachedInputCost)
+			}
+			if cost.OutputCost < 0 {
+				t.Errorf("OutputCost should not be negative, got %f", cost.OutputCost)
+			}
+			if cost.TotalCost < 0 {
+				t.Errorf("TotalCost should not be negative, got %f", cost.TotalCost)
+			}
+		})
+	}
+}
