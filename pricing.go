@@ -21,6 +21,9 @@ const TokensPerMillion = 1_000_000.0
 // 9 decimal places = nano-cents, sufficient for very low per-request costs.
 const costPrecision = 9
 
+// queriesPerThousand is the divisor for per-thousand grounding query pricing.
+const queriesPerThousand = 1000.0
+
 // addInt64Safe adds two int64 values with overflow protection.
 // Returns the result and a boolean indicating if overflow occurred.
 // On overflow, returns math.MaxInt64 or math.MinInt64 (clamped).
@@ -44,13 +47,15 @@ func roundToPrecision(value float64, precision int) float64 {
 // Pricer calculates costs across all providers.
 // Thread-safe with RWMutex for concurrent access.
 type Pricer struct {
-	models          map[string]ModelPricing
-	modelKeysSorted []string // sorted by length descending for prefix matching
-	grounding       map[string]GroundingPricing
-	groundingKeys   []string // sorted by length descending for prefix matching
-	credits         map[string]*CreditPricing
-	providers       map[string]ProviderPricing
-	mu              sync.RWMutex
+	models               map[string]ModelPricing
+	modelKeysSorted      []string // sorted by length descending for prefix matching
+	imageModels          map[string]ImageModelPricing
+	imageModelKeysSorted []string // sorted by length descending for prefix matching
+	grounding            map[string]GroundingPricing
+	groundingKeys        []string // sorted by length descending for prefix matching
+	credits              map[string]*CreditPricing
+	providers            map[string]ProviderPricing
+	mu                   sync.RWMutex
 }
 
 // NewPricer creates a new Pricer from embedded configs.
@@ -63,6 +68,7 @@ func NewPricer() (*Pricer, error) {
 // Useful for testing or loading from external sources.
 func NewPricerFromFS(fsys fs.FS, dir string) (*Pricer, error) {
 	models := make(map[string]ModelPricing)
+	imageModels := make(map[string]ImageModelPricing)
 	grounding := make(map[string]GroundingPricing)
 	credits := make(map[string]*CreditPricing)
 	providers := make(map[string]ProviderPricing)
@@ -104,6 +110,7 @@ func NewPricerFromFS(fsys fs.FS, dir string) (*Pricer, error) {
 			Provider:          providerName,
 			BillingType:       file.BillingType,
 			Models:            file.Models,
+			ImageModels:       file.ImageModels,
 			Grounding:         file.Grounding,
 			CreditPricing:     file.CreditPricing,
 			SubscriptionTiers: file.SubscriptionTiers,
@@ -149,6 +156,20 @@ func NewPricerFromFS(fsys fs.FS, dir string) (*Pricer, error) {
 			}
 			credits[providerName] = file.CreditPricing
 		}
+
+		// Merge image models into flat lookup (with validation)
+		// Keep first occurrence for duplicates (files are processed alphabetically)
+		for model, pricing := range file.ImageModels {
+			if err := validateImagePricing(model, pricing, entry.Name()); err != nil {
+				return nil, err
+			}
+			// Only add if not already present (keep first occurrence)
+			if _, exists := imageModels[model]; !exists {
+				imageModels[model] = pricing
+			}
+			// Also add provider-namespaced key for disambiguation (always unique per provider)
+			imageModels[providerName+"/"+model] = pricing
+		}
 	}
 
 	if len(providers) == 0 {
@@ -157,15 +178,18 @@ func NewPricerFromFS(fsys fs.FS, dir string) (*Pricer, error) {
 
 	// Build sorted keys for deterministic prefix matching (longest first)
 	modelKeys := sortedKeysByLengthDesc(models)
+	imageModelKeys := sortedKeysByLengthDesc(imageModels)
 	groundingKeys := sortedKeysByLengthDesc(grounding)
 
 	return &Pricer{
-		models:          models,
-		modelKeysSorted: modelKeys,
-		grounding:       grounding,
-		groundingKeys:   groundingKeys,
-		credits:         credits,
-		providers:       providers,
+		models:               models,
+		modelKeysSorted:      modelKeys,
+		imageModels:          imageModels,
+		imageModelKeysSorted: imageModelKeys,
+		grounding:            grounding,
+		groundingKeys:        groundingKeys,
+		credits:              credits,
+		providers:            providers,
 	}, nil
 }
 
@@ -235,7 +259,7 @@ func (p *Pricer) CalculateGrounding(model string, queryCount int) float64 {
 	for _, prefix := range p.groundingKeys {
 		if strings.HasPrefix(model, prefix) && isValidPrefixMatch(model, prefix) {
 			pricing := p.grounding[prefix]
-			return float64(queryCount) * pricing.PerThousandQueries / 1000.0
+			return float64(queryCount) * pricing.PerThousandQueries / queriesPerThousand
 		}
 	}
 
@@ -279,6 +303,56 @@ func (p *Pricer) CalculateCredit(provider, multiplier string) int {
 		return base // Return base on overflow rather than corrupted value
 	}
 	return base * mult
+}
+
+// CalculateImage computes the cost for image generation models.
+// If an exact model match is not found, prefix matching is used to support
+// versioned model names. The longest matching prefix is used for deterministic results.
+// Returns the total cost and a boolean indicating if the model was found.
+func (p *Pricer) CalculateImage(model string, imageCount int) (float64, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	// First check if model exists
+	pricing, ok := p.imageModels[model]
+	if !ok {
+		// Try prefix match for versioned models
+		pricing, ok = p.findImagePricingByPrefix(model)
+		if !ok {
+			return 0, false
+		}
+	}
+
+	// Model exists - return 0 cost for 0 or negative image count
+	if imageCount <= 0 {
+		return 0, true
+	}
+
+	cost := float64(imageCount) * pricing.PricePerImage
+	return roundToPrecision(cost, costPrecision), true
+}
+
+// findImagePricingByPrefix finds pricing for image models with version suffixes.
+// Uses sorted keys (longest first) for deterministic matching.
+func (p *Pricer) findImagePricingByPrefix(model string) (ImageModelPricing, bool) {
+	for _, knownModel := range p.imageModelKeysSorted {
+		if strings.HasPrefix(model, knownModel) && isValidPrefixMatch(model, knownModel) {
+			return p.imageModels[knownModel], true
+		}
+	}
+	return ImageModelPricing{}, false
+}
+
+// GetImagePricing returns the pricing for an image model, if known.
+func (p *Pricer) GetImagePricing(model string) (ImageModelPricing, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	pricing, ok := p.imageModels[model]
+	if ok {
+		return pricing, true
+	}
+	return p.findImagePricingByPrefix(model)
 }
 
 // CalculateGeminiUsage computes detailed cost for Gemini models using the full usage metadata.
@@ -423,11 +497,13 @@ func (p *Pricer) CalculateWithOptions(model string, inputTokens, outputTokens, c
 	}
 
 	batchMode := opts != nil && opts.BatchMode
+	var warnings []string
 
 	// Clamp cached tokens to not exceed total input (invalid input, but handle gracefully)
 	clampedCachedTokens := cachedTokens
 	if clampedCachedTokens > inputTokens {
 		clampedCachedTokens = inputTokens
+		warnings = append(warnings, fmt.Sprintf("cached tokens (%d) exceed input tokens (%d) - clamped", cachedTokens, inputTokens))
 	}
 
 	// Select appropriate tier based on total input
@@ -467,6 +543,7 @@ func (p *Pricer) CalculateWithOptions(model string, inputTokens, outputTokens, c
 		BatchDiscount:     batchDiscount,
 		TotalCost:         totalCost,
 		BatchMode:         batchMode,
+		Warnings:          warnings,
 	}
 }
 
@@ -573,7 +650,7 @@ func (p *Pricer) calculateGroundingLocked(model string, queryCount int) float64 
 	for _, prefix := range p.groundingKeys {
 		if strings.HasPrefix(model, prefix) && isValidPrefixMatch(model, prefix) {
 			pricing := p.grounding[prefix]
-			return float64(queryCount) * pricing.PerThousandQueries / 1000.0
+			return float64(queryCount) * pricing.PerThousandQueries / queriesPerThousand
 		}
 	}
 
@@ -694,8 +771,11 @@ func validateModelPricing(model string, pricing ModelPricing, filename string) e
 		pricing.BatchCacheRule != BatchCachePrecedence {
 		return fmt.Errorf("%s: model %q has invalid batch_cache_rule %q (must be %q or %q)", filename, model, pricing.BatchCacheRule, BatchCacheStack, BatchCachePrecedence)
 	}
-	// Validate tier prices
+	// Validate tier thresholds and prices
 	for i, tier := range pricing.Tiers {
+		if tier.ThresholdTokens < 0 {
+			return fmt.Errorf("%s: model %q tier %d has negative threshold: %d", filename, model, i, tier.ThresholdTokens)
+		}
 		if tier.InputPerMillion < 0 {
 			return fmt.Errorf("%s: model %q tier %d has negative input price: %f", filename, model, i, tier.InputPerMillion)
 		}
@@ -738,6 +818,19 @@ func validateCreditPricing(pricing *CreditPricing, filename string) error {
 	return nil
 }
 
+// validateImagePricing checks for invalid image pricing values.
+func validateImagePricing(model string, pricing ImageModelPricing, filename string) error {
+	if pricing.PricePerImage < 0 {
+		return fmt.Errorf("%s: image model %q has negative price: %f", filename, model, pricing.PricePerImage)
+	}
+	// Sanity check: prices above $100/image are likely typos
+	const maxReasonablePrice = 100.0
+	if pricing.PricePerImage > maxReasonablePrice {
+		return fmt.Errorf("%s: image model %q has suspiciously high price: %f (max %f)", filename, model, pricing.PricePerImage, maxReasonablePrice)
+	}
+	return nil
+}
+
 // copyProviderPricing returns a deep copy of ProviderPricing.
 // Prevents callers from mutating internal state.
 func copyProviderPricing(pp ProviderPricing) ProviderPricing {
@@ -760,6 +853,13 @@ func copyProviderPricing(pp ProviderPricing) ProviderPricing {
 		result.Grounding = make(map[string]GroundingPricing, len(pp.Grounding))
 		for k, v := range pp.Grounding {
 			result.Grounding[k] = v
+		}
+	}
+
+	if pp.ImageModels != nil {
+		result.ImageModels = make(map[string]ImageModelPricing, len(pp.ImageModels))
+		for k, v := range pp.ImageModels {
+			result.ImageModels[k] = v
 		}
 	}
 

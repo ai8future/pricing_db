@@ -21,12 +21,14 @@ func ensureInitialized() {
 			// Create empty pricer for graceful degradation.
 			// Callers should check InitError() to detect this condition.
 			defaultPricer = &Pricer{
-				models:          make(map[string]ModelPricing),
-				modelKeysSorted: []string{},
-				grounding:       make(map[string]GroundingPricing),
-				groundingKeys:   []string{},
-				credits:         make(map[string]*CreditPricing),
-				providers:       make(map[string]ProviderPricing),
+				models:               make(map[string]ModelPricing),
+				modelKeysSorted:      []string{},
+				imageModels:          make(map[string]ImageModelPricing),
+				imageModelKeysSorted: []string{},
+				grounding:            make(map[string]GroundingPricing),
+				groundingKeys:        []string{},
+				credits:              make(map[string]*CreditPricing),
+				providers:            make(map[string]ProviderPricing),
 			}
 		}
 	})
@@ -55,6 +57,21 @@ func CalculateGroundingCost(model string, queryCount int) float64 {
 func CalculateCreditCost(provider, multiplier string) int {
 	ensureInitialized()
 	return defaultPricer.CalculateCredit(provider, multiplier)
+}
+
+// CalculateImageCost calculates the USD cost for image generation.
+// Returns (cost, true) if the model is found, (0, false) if unknown.
+// This is a convenience function using the package-level pricer.
+func CalculateImageCost(model string, imageCount int) (float64, bool) {
+	ensureInitialized()
+	return defaultPricer.CalculateImage(model, imageCount)
+}
+
+// GetImagePricing returns the pricing for an image model, if known.
+// This is a convenience function using the package-level pricer.
+func GetImagePricing(model string) (ImageModelPricing, bool) {
+	ensureInitialized()
+	return defaultPricer.GetImagePricing(model)
 }
 
 // GetPricing returns the pricing for a model, if known.

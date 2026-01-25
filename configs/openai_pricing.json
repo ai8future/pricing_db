@@ -4,76 +4,140 @@
   "models": {
     "gpt-5.2-pro": {
       "input_per_million": 21.0,
-      "output_per_million": 168.0
+      "output_per_million": 168.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "gpt-5.2": {
       "input_per_million": 1.75,
-      "output_per_million": 14.0
+      "output_per_million": 14.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "gpt-5.1": {
       "input_per_million": 1.25,
-      "output_per_million": 10.0
+      "output_per_million": 10.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "gpt-5": {
       "input_per_million": 1.25,
-      "output_per_million": 10.0
+      "output_per_million": 10.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "gpt-5-mini": {
       "input_per_million": 0.25,
-      "output_per_million": 2.0
+      "output_per_million": 2.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "gpt-5-nano": {
       "input_per_million": 0.05,
-      "output_per_million": 0.4
+      "output_per_million": 0.4,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "gpt-4o": {
       "input_per_million": 2.5,
-      "output_per_million": 10.0
+      "output_per_million": 10.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "gpt-4o-mini": {
       "input_per_million": 0.15,
-      "output_per_million": 0.6
+      "output_per_million": 0.6,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "gpt-4-turbo": {
       "input_per_million": 10.0,
-      "output_per_million": 30.0
+      "output_per_million": 30.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "gpt-4": {
       "input_per_million": 30.0,
-      "output_per_million": 60.0
+      "output_per_million": 60.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "gpt-3.5-turbo": {
       "input_per_million": 0.5,
-      "output_per_million": 1.5
+      "output_per_million": 1.5,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "o1-pro": {
       "input_per_million": 150.0,
-      "output_per_million": 600.0
+      "output_per_million": 600.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "o1": {
       "input_per_million": 15.0,
-      "output_per_million": 60.0
+      "output_per_million": 60.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "o1-mini": {
       "input_per_million": 1.1,
-      "output_per_million": 4.4
+      "output_per_million": 4.4,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "o3": {
       "input_per_million": 2.0,
-      "output_per_million": 8.0
+      "output_per_million": 8.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "o3-mini": {
       "input_per_million": 2.0,
-      "output_per_million": 8.0
+      "output_per_million": 8.0,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     },
     "o4-mini": {
       "input_per_million": 1.1,
-      "output_per_million": 4.4
+      "output_per_million": 4.4,
+      "cache_read_multiplier": 0.50,
+      "batch_multiplier": 0.50,
+      "batch_cache_rule": "stack"
     }
   },
+  "image_models": {
+    "dall-e-3-1024-standard": { "price_per_image": 0.04 },
+    "dall-e-3-1024-hd": { "price_per_image": 0.08 },
+    "dall-e-3-1792-standard": { "price_per_image": 0.08 },
+    "dall-e-3-1792-hd": { "price_per_image": 0.12 },
+    "dall-e-2-1024": { "price_per_image": 0.02 },
+    "dall-e-2-512": { "price_per_image": 0.018 },
+    "dall-e-2-256": { "price_per_image": 0.016 }
+  },
   "metadata": {
-    "updated": "2026-01-22",
+    "updated": "2026-01-24",
     "source_urls": ["https://openai.com/api/pricing/", "https://platform.openai.com/docs/pricing"],
-    "notes": ["O-series models use reasoning tokens billed as output but not visible in responses"]
+    "notes": [
+      "O-series models use reasoning tokens billed as output but not visible in responses",
+      "Batch API: 50% discount, web search NOT supported",
+      "Cache + Batch stack: cached tokens in batch = 25% of standard (50% * 50%)"
+    ]
   }
 }

@@ -23,18 +23,18 @@ const (
 
 // ModelPricing holds per-token costs for a model (in USD per million tokens)
 type ModelPricing struct {
-	InputPerMillion      float64        `json:"input_per_million"`
-	OutputPerMillion     float64        `json:"output_per_million"`
-	Tiers                []PricingTier  `json:"tiers,omitempty"`
-	CacheReadMultiplier  float64        `json:"cache_read_multiplier,omitempty"`
-	BatchMultiplier      float64        `json:"batch_multiplier,omitempty"`
-	BatchCacheRule       BatchCacheRule `json:"batch_cache_rule,omitempty"`
+	InputPerMillion     float64        `json:"input_per_million"`
+	OutputPerMillion    float64        `json:"output_per_million"`
+	Tiers               []PricingTier  `json:"tiers,omitempty"`
+	CacheReadMultiplier float64        `json:"cache_read_multiplier,omitempty"`
+	BatchMultiplier     float64        `json:"batch_multiplier,omitempty"`
+	BatchCacheRule      BatchCacheRule `json:"batch_cache_rule,omitempty"`
 	// AudioInputPerMillion is metadata-only: the per-million rate for audio input tokens.
 	// This value is NOT used in cost calculations by this library. Callers needing audio
 	// pricing should use this value directly with their own audio token counts.
 	// Stored for reference and future API expansion.
-	AudioInputPerMillion float64        `json:"audio_input_per_million,omitempty"`
-	BatchGroundingOK     bool           `json:"batch_grounding_ok,omitempty"` // false = grounding not supported in batch
+	AudioInputPerMillion float64 `json:"audio_input_per_million,omitempty"`
+	BatchGroundingOK     bool    `json:"batch_grounding_ok,omitempty"` // false = grounding not supported in batch
 }
 
 // PricingTier defines pricing for a specific token threshold (e.g., >200K tokens)
@@ -61,6 +61,11 @@ type CreditMultiplier struct {
 type CreditPricing struct {
 	BaseCostPerRequest int              `json:"base_cost_per_request"`
 	Multipliers        CreditMultiplier `json:"multipliers,omitempty"`
+}
+
+// ImageModelPricing holds per-image costs for image generation models (in USD per image)
+type ImageModelPricing struct {
+	PricePerImage float64 `json:"price_per_image"`
 }
 
 // SubscriptionTier defines a subscription plan
@@ -126,15 +131,15 @@ type CalculateOptions struct {
 // GeminiResponse represents a full Gemini API response.
 // Use ParseGeminiResponse to extract cost-relevant fields.
 type GeminiResponse struct {
-	Candidates    []GeminiCandidate    `json:"candidates"`
-	UsageMetadata GeminiUsageMetadata  `json:"usageMetadata"`
-	ModelVersion  string               `json:"modelVersion"`
+	Candidates    []GeminiCandidate   `json:"candidates"`
+	UsageMetadata GeminiUsageMetadata `json:"usageMetadata"`
+	ModelVersion  string              `json:"modelVersion"`
 }
 
 // GeminiCandidate represents a single candidate in a Gemini response.
 type GeminiCandidate struct {
-	Content           GeminiContent           `json:"content"`
-	FinishReason      string                  `json:"finishReason"`
+	Content           GeminiContent            `json:"content"`
+	FinishReason      string                   `json:"finishReason"`
 	GroundingMetadata *GeminiGroundingMetadata `json:"groundingMetadata,omitempty"`
 }
 
@@ -173,24 +178,27 @@ type PricingMetadata struct {
 }
 
 // ProviderPricing holds all pricing data for a single provider.
-// Supports token-based (Models), grounding (Grounding), and credit-based (CreditPricing).
+// Supports token-based (Models), grounding (Grounding), credit-based (CreditPricing),
+// and image-based (ImageModels) pricing.
 type ProviderPricing struct {
-	Provider          string                      `json:"provider"`
-	BillingType       string                      `json:"billing_type,omitempty"` // "token" or "credit"
-	Models            map[string]ModelPricing     `json:"models,omitempty"`
-	Grounding         map[string]GroundingPricing `json:"grounding,omitempty"`
-	CreditPricing     *CreditPricing              `json:"credit_pricing,omitempty"`
-	SubscriptionTiers map[string]SubscriptionTier `json:"subscription_tiers,omitempty"`
-	Metadata          PricingMetadata             `json:"metadata,omitempty"`
+	Provider          string                       `json:"provider"`
+	BillingType       string                       `json:"billing_type,omitempty"` // "token", "credit", or "image"
+	Models            map[string]ModelPricing      `json:"models,omitempty"`
+	ImageModels       map[string]ImageModelPricing `json:"image_models,omitempty"`
+	Grounding         map[string]GroundingPricing  `json:"grounding,omitempty"`
+	CreditPricing     *CreditPricing               `json:"credit_pricing,omitempty"`
+	SubscriptionTiers map[string]SubscriptionTier  `json:"subscription_tiers,omitempty"`
+	Metadata          PricingMetadata              `json:"metadata,omitempty"`
 }
 
 // pricingFile represents the JSON structure (supports all formats)
 type pricingFile struct {
-	Provider          string                      `json:"provider,omitempty"`
-	BillingType       string                      `json:"billing_type,omitempty"`
-	Models            map[string]ModelPricing     `json:"models,omitempty"`
-	Grounding         map[string]GroundingPricing `json:"grounding,omitempty"`
-	CreditPricing     *CreditPricing              `json:"credit_pricing,omitempty"`
-	SubscriptionTiers map[string]SubscriptionTier `json:"subscription_tiers,omitempty"`
-	Metadata          PricingMetadata             `json:"metadata,omitempty"`
+	Provider          string                       `json:"provider,omitempty"`
+	BillingType       string                       `json:"billing_type,omitempty"`
+	Models            map[string]ModelPricing      `json:"models,omitempty"`
+	ImageModels       map[string]ImageModelPricing `json:"image_models,omitempty"`
+	Grounding         map[string]GroundingPricing  `json:"grounding,omitempty"`
+	CreditPricing     *CreditPricing               `json:"credit_pricing,omitempty"`
+	SubscriptionTiers map[string]SubscriptionTier  `json:"subscription_tiers,omitempty"`
+	Metadata          PricingMetadata              `json:"metadata,omitempty"`
 }
