@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2026-01-26
+
+### Changed
+- Split pricing_test.go into focused test files for better maintainability:
+  - benchmark_test.go: performance benchmarks
+  - image_test.go: image pricing tests
+  - validation_test.go: configuration validation tests
+- Reduced pricing_test.go from ~3200 to 2329 lines
+
+---
+Agent: Claude:Opus 4.5
+
 ## [1.0.3] - 2026-01-24
 
 ### Added
