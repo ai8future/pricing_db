@@ -87,8 +87,10 @@ type Cost struct {
 
 // TokenUsage holds detailed token breakdown for complex calculations.
 // This struct is defined for future API expansion to support a unified interface
-// across providers. Currently, provider-specific structs like GeminiUsageMetadata
-// are used directly. TokenUsage may be used in future versions to provide a
+// across providers.
+//
+// TODO: Currently unused. Provider-specific structs like GeminiUsageMetadata are
+// used directly. TokenUsage may be used in future versions to provide a
 // normalized view of token usage across all providers.
 type TokenUsage struct {
 	PromptTokens     int64 // Standard input tokens

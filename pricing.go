@@ -201,6 +201,11 @@ func (p *Pricer) Calculate(model string, inputTokens, outputTokens int64) Cost {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
+	// Early return for empty model string
+	if model == "" {
+		return Cost{Model: model, InputTokens: inputTokens, OutputTokens: outputTokens, Unknown: true}
+	}
+
 	// Clamp negative tokens to 0
 	if inputTokens < 0 {
 		inputTokens = 0
@@ -235,12 +240,7 @@ func (p *Pricer) Calculate(model string, inputTokens, outputTokens int64) Cost {
 // E.g., "gpt-4o-2024-08-06" matches "gpt-4o"
 // Uses sorted keys (longest first) for deterministic matching.
 func (p *Pricer) findPricingByPrefix(model string) (ModelPricing, bool) {
-	for _, knownModel := range p.modelKeysSorted {
-		if strings.HasPrefix(model, knownModel) && isValidPrefixMatch(model, knownModel) {
-			return p.models[knownModel], true
-		}
-	}
-	return ModelPricing{}, false
+	return findByPrefix(model, p.modelKeysSorted, p.models)
 }
 
 // CalculateGrounding computes the cost for Google grounding/search.
@@ -335,12 +335,7 @@ func (p *Pricer) CalculateImage(model string, imageCount int) (float64, bool) {
 // findImagePricingByPrefix finds pricing for image models with version suffixes.
 // Uses sorted keys (longest first) for deterministic matching.
 func (p *Pricer) findImagePricingByPrefix(model string) (ImageModelPricing, bool) {
-	for _, knownModel := range p.imageModelKeysSorted {
-		if strings.HasPrefix(model, knownModel) && isValidPrefixMatch(model, knownModel) {
-			return p.imageModels[knownModel], true
-		}
-	}
-	return ImageModelPricing{}, false
+	return findByPrefix(model, p.imageModelKeysSorted, p.imageModels)
 }
 
 // GetImagePricing returns the pricing for an image model, if known.
@@ -647,11 +642,8 @@ func (p *Pricer) calculateGroundingLocked(model string, queryCount int) float64 
 		return 0
 	}
 
-	for _, prefix := range p.groundingKeys {
-		if strings.HasPrefix(model, prefix) && isValidPrefixMatch(model, prefix) {
-			pricing := p.grounding[prefix]
-			return float64(queryCount) * pricing.PerThousandQueries / queriesPerThousand
-		}
+	if pricing, found := findByPrefix(model, p.groundingKeys, p.grounding); found {
+		return float64(queryCount) * pricing.PerThousandQueries / queriesPerThousand
 	}
 
 	return 0
@@ -717,6 +709,18 @@ func isValidPrefixMatch(model, prefix string) bool {
 	return nextChar == '-' || nextChar == '_' || nextChar == '/' || nextChar == '.'
 }
 
+// findByPrefix searches for a model in sorted keys using prefix matching.
+// Keys must be sorted by length descending for deterministic matching.
+func findByPrefix[V any](model string, keys []string, data map[string]V) (V, bool) {
+	for _, key := range keys {
+		if strings.HasPrefix(model, key) && isValidPrefixMatch(model, key) {
+			return data[key], true
+		}
+	}
+	var zero V
+	return zero, false
+}
+
 // sortedKeysByLengthDesc returns map keys sorted by length descending.
 // Used for deterministic prefix matching (longest match first).
 // Ties are broken alphabetically for fully deterministic ordering.
@@ -734,32 +738,48 @@ func sortedKeysByLengthDesc[V any](m map[string]V) []string {
 	return keys
 }
 
+// validateNonNegative returns an error if value is negative.
+func validateNonNegative(value float64, field, context, filename string) error {
+	if value < 0 {
+		return fmt.Errorf("%s: %s has negative %s: %f", filename, context, field, value)
+	}
+	return nil
+}
+
+// validateMaxReasonable returns an error if value exceeds a reasonable maximum.
+func validateMaxReasonable(value float64, field string, max float64, context, filename string) error {
+	if value > max {
+		return fmt.Errorf("%s: %s has suspiciously high %s: %f (max %f)", filename, context, field, value, max)
+	}
+	return nil
+}
+
 // validateModelPricing checks for invalid pricing values.
 func validateModelPricing(model string, pricing ModelPricing, filename string) error {
-	if pricing.InputPerMillion < 0 {
-		return fmt.Errorf("%s: model %q has negative input price: %f", filename, model, pricing.InputPerMillion)
-	}
-	if pricing.OutputPerMillion < 0 {
-		return fmt.Errorf("%s: model %q has negative output price: %f", filename, model, pricing.OutputPerMillion)
-	}
-	// Sanity check: prices above $10,000/million are likely typos
+	context := fmt.Sprintf("model %q", model)
 	const maxReasonablePrice = 10000.0
-	if pricing.InputPerMillion > maxReasonablePrice {
-		return fmt.Errorf("%s: model %q has suspiciously high input price: %f (max %f)", filename, model, pricing.InputPerMillion, maxReasonablePrice)
+
+	if err := validateNonNegative(pricing.InputPerMillion, "input price", context, filename); err != nil {
+		return err
 	}
-	if pricing.OutputPerMillion > maxReasonablePrice {
-		return fmt.Errorf("%s: model %q has suspiciously high output price: %f (max %f)", filename, model, pricing.OutputPerMillion, maxReasonablePrice)
+	if err := validateNonNegative(pricing.OutputPerMillion, "output price", context, filename); err != nil {
+		return err
 	}
-	// Validate multipliers are non-negative
-	if pricing.BatchMultiplier < 0 {
-		return fmt.Errorf("%s: model %q has negative batch multiplier: %f", filename, model, pricing.BatchMultiplier)
+	if err := validateMaxReasonable(pricing.InputPerMillion, "input price", maxReasonablePrice, context, filename); err != nil {
+		return err
+	}
+	if err := validateMaxReasonable(pricing.OutputPerMillion, "output price", maxReasonablePrice, context, filename); err != nil {
+		return err
+	}
+	if err := validateNonNegative(pricing.BatchMultiplier, "batch multiplier", context, filename); err != nil {
+		return err
 	}
 	// Batch multiplier > 1.0 would increase price, which is likely a config error
 	if pricing.BatchMultiplier > 1.0 {
 		return fmt.Errorf("%s: model %q has batch_multiplier > 1.0 (%f) which would increase price (likely config error)", filename, model, pricing.BatchMultiplier)
 	}
-	if pricing.CacheReadMultiplier < 0 {
-		return fmt.Errorf("%s: model %q has negative cache read multiplier: %f", filename, model, pricing.CacheReadMultiplier)
+	if err := validateNonNegative(pricing.CacheReadMultiplier, "cache read multiplier", context, filename); err != nil {
+		return err
 	}
 	// Cache multiplier > 1.0 would charge more for cached tokens than standard (nonsensical)
 	if pricing.CacheReadMultiplier > 1.0 {
@@ -773,17 +793,21 @@ func validateModelPricing(model string, pricing ModelPricing, filename string) e
 	}
 	// Validate tier thresholds and prices
 	for i, tier := range pricing.Tiers {
+		tierContext := fmt.Sprintf("model %q tier %d", model, i)
 		if tier.ThresholdTokens < 0 {
 			return fmt.Errorf("%s: model %q tier %d has negative threshold: %d", filename, model, i, tier.ThresholdTokens)
 		}
-		if tier.InputPerMillion < 0 {
-			return fmt.Errorf("%s: model %q tier %d has negative input price: %f", filename, model, i, tier.InputPerMillion)
+		if err := validateNonNegative(tier.InputPerMillion, "input price", tierContext, filename); err != nil {
+			return err
 		}
-		if tier.OutputPerMillion < 0 {
-			return fmt.Errorf("%s: model %q tier %d has negative output price: %f", filename, model, i, tier.OutputPerMillion)
+		if err := validateNonNegative(tier.OutputPerMillion, "output price", tierContext, filename); err != nil {
+			return err
 		}
-		if tier.InputPerMillion > maxReasonablePrice || tier.OutputPerMillion > maxReasonablePrice {
-			return fmt.Errorf("%s: model %q tier %d has suspiciously high price", filename, model, i)
+		if err := validateMaxReasonable(tier.InputPerMillion, "input price", maxReasonablePrice, tierContext, filename); err != nil {
+			return err
+		}
+		if err := validateMaxReasonable(tier.OutputPerMillion, "output price", maxReasonablePrice, tierContext, filename); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -791,8 +815,9 @@ func validateModelPricing(model string, pricing ModelPricing, filename string) e
 
 // validateGroundingPricing checks for invalid grounding pricing values.
 func validateGroundingPricing(prefix string, pricing GroundingPricing, filename string) error {
-	if pricing.PerThousandQueries < 0 {
-		return fmt.Errorf("%s: grounding prefix %q has negative price: %f", filename, prefix, pricing.PerThousandQueries)
+	context := fmt.Sprintf("grounding prefix %q", prefix)
+	if err := validateNonNegative(pricing.PerThousandQueries, "price", context, filename); err != nil {
+		return err
 	}
 	// Validate billing model if specified
 	if pricing.BillingModel != "" && pricing.BillingModel != "per_query" && pricing.BillingModel != "per_prompt" {
@@ -820,13 +845,14 @@ func validateCreditPricing(pricing *CreditPricing, filename string) error {
 
 // validateImagePricing checks for invalid image pricing values.
 func validateImagePricing(model string, pricing ImageModelPricing, filename string) error {
-	if pricing.PricePerImage < 0 {
-		return fmt.Errorf("%s: image model %q has negative price: %f", filename, model, pricing.PricePerImage)
-	}
-	// Sanity check: prices above $100/image are likely typos
+	context := fmt.Sprintf("image model %q", model)
 	const maxReasonablePrice = 100.0
-	if pricing.PricePerImage > maxReasonablePrice {
-		return fmt.Errorf("%s: image model %q has suspiciously high price: %f (max %f)", filename, model, pricing.PricePerImage, maxReasonablePrice)
+
+	if err := validateNonNegative(pricing.PricePerImage, "price", context, filename); err != nil {
+		return err
+	}
+	if err := validateMaxReasonable(pricing.PricePerImage, "price", maxReasonablePrice, context, filename); err != nil {
+		return err
 	}
 	return nil
 }
