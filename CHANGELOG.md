@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.7] - 2026-02-08
+
+### Changed
+- Upgraded chassis-go from v4 to v5 (module path `chassis-go/v5 v5.0.0`)
+- Updated RequireMajor(4) to RequireMajor(5) in CLI and tests
+- Added VERSION.chassis tracking file
+
+---
+Agent: Claude:Opus 4.6
+
+## [1.0.6] - 2026-02-08
+
+### Added
+- JSON security validation via chassis-go secval (rejects prototype pollution, excessive nesting)
+- CLI tests using chassis-go testkit (config loading, secval integration)
+
+### Fixed
+- Version drift: const version in main.go now matches VERSION file
+
+---
+Agent: Claude:Opus 4.6
+
+## [1.0.5] - 2026-02-06
+
+### Changed
+- Upgraded chassis-go to v1.4.0 (chassis 4.0.0)
+- Integrated chassis config, logz, and RequireMajor(4) into CLI
+
+---
+Agent: Claude:Opus 4.5
+
 ## [1.0.4] - 2026-01-26
 
 ### Changed

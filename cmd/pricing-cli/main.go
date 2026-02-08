@@ -8,13 +8,14 @@ import (
 	"io"
 	"os"
 
-	chassis "github.com/ai8future/chassis-go"
-	"github.com/ai8future/chassis-go/config"
-	"github.com/ai8future/chassis-go/logz"
+	chassis "github.com/ai8future/chassis-go/v5"
+	"github.com/ai8future/chassis-go/v5/config"
+	"github.com/ai8future/chassis-go/v5/logz"
+	"github.com/ai8future/chassis-go/v5/secval"
 	pricing "github.com/ai8future/pricing_db"
 )
 
-const version = "1.0.4"
+const version = "1.0.7"
 
 // CLIConfig holds environment-based configuration overrides.
 // Flags take precedence over these values when explicitly set.
@@ -39,11 +40,16 @@ type OutputJSON struct {
 	Unknown           bool     `json:"unknown"`
 }
 
+// loadConfig loads CLIConfig from environment variables via chassis config.
+func loadConfig() CLIConfig {
+	return config.MustLoad[CLIConfig]()
+}
+
 func main() {
-	chassis.RequireMajor(4)
+	chassis.RequireMajor(5)
 
 	// Load env-based config (all fields optional, safe to call unconditionally)
-	cfg := config.MustLoad[CLIConfig]()
+	cfg := loadConfig()
 
 	// Define flags
 	fileFlag := flag.String("f", "", "Read JSON from file (default: stdin)")
@@ -135,6 +141,12 @@ func main() {
 	}
 
 	logger.Debug("input read", "bytes", len(input))
+
+	// Security: reject dangerous JSON keys before parsing
+	if err := secval.ValidateJSON(input); err != nil {
+		logger.Error("JSON security validation failed", "error", err)
+		os.Exit(1)
+	}
 
 	// Parse and calculate
 	var opts *pricing.CalculateOptions
