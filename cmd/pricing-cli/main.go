@@ -40,6 +40,8 @@ type OutputJSON struct {
 }
 
 func main() {
+	chassis.RequireMajor(4)
+
 	// Load env-based config (all fields optional, safe to call unconditionally)
 	cfg := config.MustLoad[CLIConfig]()
 
