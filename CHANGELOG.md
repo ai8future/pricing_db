@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.0.10] - 2026-03-07
+- Sync uncommitted changes
+
 All notable changes to this project will be documented in this file.
 
 ## [1.0.9] - 2026-03-07
