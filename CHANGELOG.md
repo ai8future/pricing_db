@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.9] - 2026-03-07
+
+### Changed
+- Upgraded chassis-go from v5 to v6 (module path `chassis-go/v6 v6.0.9`)
+- Updated RequireMajor(5) to RequireMajor(6) in CLI and tests
+- Updated VERSION.chassis tracking file
+
+---
+Agent: Claude:Opus 4.6
+
+## [1.0.8] - 2026-02-17
+
+### Changed
+- Rewrote README.md with comprehensive documentation covering all APIs, CLI usage, architecture, configuration format, supported providers, testing, and project structure
+
+---
+Agent: Claude:Opus 4.6
+
 ## [1.0.7] - 2026-02-08
 
 ### Changed

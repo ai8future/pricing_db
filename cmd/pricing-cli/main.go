@@ -8,14 +8,14 @@ import (
 	"io"
 	"os"
 
-	chassis "github.com/ai8future/chassis-go/v5"
-	"github.com/ai8future/chassis-go/v5/config"
-	"github.com/ai8future/chassis-go/v5/logz"
-	"github.com/ai8future/chassis-go/v5/secval"
+	chassis "github.com/ai8future/chassis-go/v6"
+	"github.com/ai8future/chassis-go/v6/config"
+	"github.com/ai8future/chassis-go/v6/logz"
+	"github.com/ai8future/chassis-go/v6/secval"
 	pricing "github.com/ai8future/pricing_db"
 )
 
-const version = "1.0.7"
+const version = "1.0.9"
 
 // CLIConfig holds environment-based configuration overrides.
 // Flags take precedence over these values when explicitly set.
@@ -46,7 +46,7 @@ func loadConfig() CLIConfig {
 }
 
 func main() {
-	chassis.RequireMajor(5)
+	chassis.RequireMajor(6)
 
 	// Load env-based config (all fields optional, safe to call unconditionally)
 	cfg := loadConfig()
