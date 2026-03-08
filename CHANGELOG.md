@@ -1,9 +1,17 @@
 # Changelog
 
-## [1.0.10] - 2026-03-07
-- Sync uncommitted changes
-
 All notable changes to this project will be documented in this file.
+
+## [1.0.11] - 2026-03-07
+
+### Changed
+- Upgraded chassis-go from v6 to v7 (module path `chassis-go/v7 v7.0.0`)
+- Updated RequireMajor(6) to RequireMajor(7) in CLI and tests
+- Added CLI registry pattern (registry.InitCLI / registry.ShutdownCLI)
+- Updated VERSION.chassis tracking file
+
+---
+Agent: Claude:Opus 4.6
 
 ## [1.0.9] - 2026-03-07
 

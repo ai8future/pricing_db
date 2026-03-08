@@ -6,16 +6,18 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
-	chassis "github.com/ai8future/chassis-go/v6"
-	"github.com/ai8future/chassis-go/v6/config"
-	"github.com/ai8future/chassis-go/v6/logz"
-	"github.com/ai8future/chassis-go/v6/secval"
+	chassis "github.com/ai8future/chassis-go/v8"
+	"github.com/ai8future/chassis-go/v8/config"
+	"github.com/ai8future/chassis-go/v8/logz"
+	"github.com/ai8future/chassis-go/v8/registry"
+	"github.com/ai8future/chassis-go/v8/secval"
 	pricing "github.com/ai8future/pricing_db"
 )
 
-const version = "1.0.9"
+const version = "1.0.11"
 
 // CLIConfig holds environment-based configuration overrides.
 // Flags take precedence over these values when explicitly set.
@@ -46,10 +48,15 @@ func loadConfig() CLIConfig {
 }
 
 func main() {
-	chassis.RequireMajor(6)
+	chassis.RequireMajor(8)
 
 	// Load env-based config (all fields optional, safe to call unconditionally)
 	cfg := loadConfig()
+
+	// Register CLI with chassis registry
+	if err := registry.InitCLI(chassis.Version); err != nil {
+		log.Fatalf("registry: %v", err)
+	}
 
 	// Define flags
 	fileFlag := flag.String("f", "", "Read JSON from file (default: stdin)")
@@ -184,6 +191,8 @@ func main() {
 	} else {
 		printJSON(costDetails)
 	}
+
+	registry.ShutdownCLI(0)
 }
 
 func printJSON(c pricing.CostDetails) {
