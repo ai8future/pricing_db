@@ -9,11 +9,12 @@ import (
 	"log"
 	"os"
 
-	chassis "github.com/ai8future/chassis-go/v8"
-	"github.com/ai8future/chassis-go/v8/config"
-	"github.com/ai8future/chassis-go/v8/logz"
-	"github.com/ai8future/chassis-go/v8/registry"
-	"github.com/ai8future/chassis-go/v8/secval"
+	chassis "github.com/ai8future/chassis-go/v9"
+	"github.com/ai8future/chassis-go/v9/config"
+	"github.com/ai8future/chassis-go/v9/deploy"
+	"github.com/ai8future/chassis-go/v9/logz"
+	"github.com/ai8future/chassis-go/v9/registry"
+	"github.com/ai8future/chassis-go/v9/secval"
 	pricing "github.com/ai8future/pricing_db"
 )
 
@@ -48,7 +49,10 @@ func loadConfig() CLIConfig {
 }
 
 func main() {
-	chassis.RequireMajor(8)
+	chassis.RequireMajor(9)
+
+	d := deploy.Discover("pricing_db")
+	d.LoadEnv()
 
 	// Load env-based config (all fields optional, safe to call unconditionally)
 	cfg := loadConfig()

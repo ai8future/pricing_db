@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.13] - 2026-03-08
+
+### Changed
+- Fix stale VERSION.chassis (was 7.0.0, now 9.0.0)
+
+---
+Agent: Claude Code (Claude:Opus 4.6)
+
+## [1.0.12] - 2026-03-08
+
+### Changed
+- Upgraded chassis-go from v8 to v9 (module path `chassis-go/v9 v9.0.0`)
+- Updated RequireMajor(8) to RequireMajor(9) in CLI and tests
+- Added deploy package integration for environment detection and env file loading
+
+---
+Agent: Claude Code (Claude:Opus 4.6)
+
 ## [1.0.11] - 2026-03-07
 
 ### Changed

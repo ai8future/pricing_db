@@ -2,7 +2,7 @@ module github.com/ai8future/pricing_db
 
 go 1.25.5
 
-require github.com/ai8future/chassis-go/v8 v8.0.0
+require github.com/ai8future/chassis-go/v9 v9.0.0
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -10,4 +10,4 @@ require (
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
 )
 
-replace github.com/ai8future/chassis-go/v8 => ../../chassis_suite/chassis-go
+replace github.com/ai8future/chassis-go/v9 => ../../chassis_suite/chassis-go
