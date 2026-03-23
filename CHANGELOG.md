@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-03-22
+- Add xyops client for job triggering
+- Add defer registry.ShutdownCLI(0) for clean exit handling
+- (Claude Code:Opus 4.6)
+
+## [1.0.14] - 2026-03-22
+
+### Changed
+- Upgraded chassis-go from v9 to v10 (module path `chassis-go/v10 v10.0.0`)
+- Updated RequireMajor(9) to RequireMajor(10) in CLI and tests
+- Updated all chassis import paths from v9 to v10 (config, deploy, logz, registry, secval, testkit)
+- Updated VERSION.chassis to 10.0.0
+
+---
+Agent: Claude Code (Claude:Opus 4.6)
+
 ## [1.0.13] - 2026-03-08
 
 ### Changed
