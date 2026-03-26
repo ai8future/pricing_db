@@ -23,6 +23,7 @@ venv/
 /vendor
 
 # Go
+bin/
 *.exe
 *.test
 .gocache/

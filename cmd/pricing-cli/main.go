@@ -19,7 +19,7 @@ import (
 	pricing "github.com/ai8future/pricing_db"
 )
 
-const version = "1.0.11"
+var version = "dev"
 
 // CLIConfig holds environment-based configuration overrides.
 // Flags take precedence over these values when explicitly set.
