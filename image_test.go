@@ -97,6 +97,55 @@ func TestGetImagePricing(t *testing.T) {
 	}
 }
 
+func TestCalculateImage_PrefixMatch(t *testing.T) {
+	// Create a pricer with image models that can be prefix-matched
+	fsys := fstest.MapFS{
+		"configs/test_pricing.json": &fstest.MapFile{Data: []byte(`{
+			"provider": "test",
+			"image_models": {
+				"test-img-model": {"price_per_image": 0.05}
+			}
+		}`)},
+	}
+	p, err := NewPricerFromFS(fsys, "configs")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Exact match should work
+	cost, found := p.CalculateImage("test-img-model", 1)
+	if !found {
+		t.Fatal("expected to find test-img-model")
+	}
+	if !floatEquals(cost, 0.05) {
+		t.Errorf("expected cost 0.05, got %f", cost)
+	}
+
+	// Versioned model should fall back to prefix match
+	cost, found = p.CalculateImage("test-img-model-2025-01-01", 5)
+	if !found {
+		t.Fatal("expected test-img-model-2025-01-01 to match test-img-model via prefix")
+	}
+	if !floatEquals(cost, 0.25) {
+		t.Errorf("expected cost 0.25 for 5 images, got %f", cost)
+	}
+
+	// GetImagePricing should also support prefix matching
+	pricing, ok := p.GetImagePricing("test-img-model-v2")
+	if !ok {
+		t.Fatal("expected GetImagePricing to find test-img-model-v2 via prefix")
+	}
+	if !floatEquals(pricing.PricePerImage, 0.05) {
+		t.Errorf("expected price 0.05, got %f", pricing.PricePerImage)
+	}
+
+	// Non-matching prefix should not match
+	_, found = p.CalculateImage("different-model-2025", 1)
+	if found {
+		t.Error("expected no match for different-model-2025")
+	}
+}
+
 func TestImagePricing_ProviderNamespacing(t *testing.T) {
 	p, err := NewPricer()
 	if err != nil {

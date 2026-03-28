@@ -43,6 +43,31 @@ func TestNewPricerFromFS_NoPricingFiles(t *testing.T) {
 	}
 }
 
+func TestNewPricerFromFS_SkipsNonPricingFiles(t *testing.T) {
+	fsys := fstest.MapFS{
+		"configs/valid_pricing.json": &fstest.MapFile{Data: []byte(`{
+			"provider": "valid",
+			"models": {
+				"test-model": {
+					"input_per_million": 1.0,
+					"output_per_million": 2.0
+				}
+			}
+		}`)},
+		"configs/README.md":     &fstest.MapFile{Data: []byte("# readme")},
+		"configs/notes.json":    &fstest.MapFile{Data: []byte(`{"not": "pricing"}`)},
+		"configs/something.txt": &fstest.MapFile{Data: []byte("hello")},
+	}
+	p, err := NewPricerFromFS(fsys, "configs")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	providers := p.ListProviders()
+	if len(providers) != 1 || providers[0] != "valid" {
+		t.Errorf("expected only 'valid' provider, got %v", providers)
+	}
+}
+
 func TestNewPricerFromFS_NegativePrice(t *testing.T) {
 	fsys := fstest.MapFS{
 		"configs/test_pricing.json": &fstest.MapFile{

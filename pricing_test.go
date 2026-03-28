@@ -72,6 +72,21 @@ func TestCalculate_UnknownModel(t *testing.T) {
 	}
 }
 
+func TestCalculate_EmptyModel(t *testing.T) {
+	p, err := NewPricer()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cost := p.Calculate("", 1000, 500)
+	if !cost.Unknown {
+		t.Error("expected Unknown=true for empty model string")
+	}
+	if cost.TotalCost != 0 {
+		t.Errorf("expected zero cost for empty model, got %f", cost.TotalCost)
+	}
+}
+
 func TestCalculate_PrefixMatch(t *testing.T) {
 	p, err := NewPricer()
 	if err != nil {
@@ -508,6 +523,38 @@ func TestCalculateCredit_ZeroMultiplier(t *testing.T) {
 	credits = p.CalculateCredit("test", "premium_proxy")
 	if credits != 50 {
 		t.Errorf("expected 50 for premium_proxy, got %d", credits)
+	}
+}
+
+func TestCalculateCredit_JSPremiumMultiplier(t *testing.T) {
+	fsys := fstest.MapFS{
+		"configs/testprov_pricing.json": &fstest.MapFile{Data: []byte(`{
+			"provider": "testprov",
+			"billing_type": "credit",
+			"credit_pricing": {
+				"base_cost_per_request": 100,
+				"multipliers": {
+					"js_rendering": 200,
+					"premium_proxy": 300,
+					"js_premium": 500
+				}
+			}
+		}`)},
+	}
+	p, err := NewPricerFromFS(fsys, "configs")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cost := p.CalculateCredit("testprov", "js_premium")
+	expected := 100 * 500
+	if cost != expected {
+		t.Errorf("js_premium: expected %d, got %d", expected, cost)
+	}
+
+	baseCost := p.CalculateCredit("testprov", "base")
+	if baseCost != 100 {
+		t.Errorf("base: expected 100, got %d", baseCost)
 	}
 }
 
@@ -1276,6 +1323,53 @@ func TestBatchGroundingExcluded_Gemini(t *testing.T) {
 	}
 }
 
+func TestBatchGroundingIncluded_WhenAllowed(t *testing.T) {
+	fsys := fstest.MapFS{
+		"configs/custom_pricing.json": &fstest.MapFile{Data: []byte(`{
+			"provider": "custom",
+			"models": {
+				"custom-model": {
+					"input_per_million": 1.0,
+					"output_per_million": 4.0,
+					"batch_multiplier": 0.5,
+					"batch_cache_rule": "stack",
+					"batch_grounding_ok": true
+				}
+			},
+			"grounding": {
+				"custom-model": {
+					"per_thousand_queries": 35.0,
+					"billing_model": "per_query"
+				}
+			}
+		}`)},
+	}
+
+	p, err := NewPricerFromFS(fsys, "configs")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	metadata := GeminiUsageMetadata{
+		PromptTokenCount:     1000,
+		CandidatesTokenCount: 500,
+	}
+
+	cost := p.CalculateGeminiUsage("custom-model", metadata, 5, &CalculateOptions{BatchMode: true})
+
+	// Grounding should be INCLUDED (batch_grounding_ok is true)
+	if cost.GroundingCost <= 0 {
+		t.Errorf("expected grounding cost > 0 when batch_grounding_ok is true, got %f", cost.GroundingCost)
+	}
+
+	// No warning about grounding exclusion
+	for _, w := range cost.Warnings {
+		if strings.Contains(w, "grounding") {
+			t.Errorf("unexpected grounding warning: %s", w)
+		}
+	}
+}
+
 func TestBatchCacheStack_OpenAI(t *testing.T) {
 	p, err := NewPricer()
 	if err != nil {
@@ -1613,6 +1707,134 @@ func TestParseGeminiResponse_NoGrounding(t *testing.T) {
 	}
 }
 
+func TestParseGeminiResponseWithOptions_BatchMode(t *testing.T) {
+	jsonData := []byte(`{
+		"modelVersion": "gemini-2.5-flash",
+		"usageMetadata": {
+			"promptTokenCount": 1000,
+			"candidatesTokenCount": 500
+		},
+		"candidates": [{"content": {"parts": [{"text": "ok"}], "role": "model"}, "finishReason": "STOP"}]
+	}`)
+
+	stdCost, err := ParseGeminiResponse(jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	batchCost, err := ParseGeminiResponseWithOptions(jsonData, &CalculateOptions{BatchMode: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !batchCost.BatchMode {
+		t.Error("expected BatchMode to be true")
+	}
+	if batchCost.TotalCost >= stdCost.TotalCost {
+		t.Errorf("batch cost (%f) should be less than standard (%f)", batchCost.TotalCost, stdCost.TotalCost)
+	}
+}
+
+func TestCalculateGeminiResponseCost_EmptySearchQueries(t *testing.T) {
+	resp := GeminiResponse{
+		ModelVersion: "gemini-2.5-flash",
+		UsageMetadata: GeminiUsageMetadata{
+			PromptTokenCount:     1000,
+			CandidatesTokenCount: 500,
+		},
+		Candidates: []GeminiCandidate{
+			{
+				Content:      GeminiContent{Parts: []GeminiPart{{Text: "test"}}, Role: "model"},
+				FinishReason: "STOP",
+				GroundingMetadata: &GeminiGroundingMetadata{
+					WebSearchQueries: []string{"real query", "", "", "another query", ""},
+				},
+			},
+		},
+	}
+
+	cost := CalculateGeminiResponseCostWithModel(resp, "", nil)
+	if cost.GroundingCost <= 0 {
+		t.Error("expected grounding cost > 0 for non-empty queries")
+	}
+
+	// Compare to version with only the 2 non-empty queries
+	respClean := GeminiResponse{
+		ModelVersion:  "gemini-2.5-flash",
+		UsageMetadata: resp.UsageMetadata,
+		Candidates: []GeminiCandidate{
+			{
+				Content:      GeminiContent{Parts: []GeminiPart{{Text: "test"}}, Role: "model"},
+				FinishReason: "STOP",
+				GroundingMetadata: &GeminiGroundingMetadata{
+					WebSearchQueries: []string{"real query", "another query"},
+				},
+			},
+		},
+	}
+	costClean := CalculateGeminiResponseCostWithModel(respClean, "", nil)
+	if !floatEquals(cost.GroundingCost, costClean.GroundingCost) {
+		t.Errorf("grounding costs should match: with empties=%f, without=%f",
+			cost.GroundingCost, costClean.GroundingCost)
+	}
+}
+
+func TestCalculateGeminiResponseCost_MultipleCandidatesWithGrounding(t *testing.T) {
+	resp := GeminiResponse{
+		ModelVersion: "gemini-2.5-flash",
+		UsageMetadata: GeminiUsageMetadata{
+			PromptTokenCount:     1000,
+			CandidatesTokenCount: 500,
+		},
+		Candidates: []GeminiCandidate{
+			{
+				Content:      GeminiContent{Parts: []GeminiPart{{Text: "result1"}}, Role: "model"},
+				FinishReason: "STOP",
+				GroundingMetadata: &GeminiGroundingMetadata{
+					WebSearchQueries: []string{"query1", "query2"},
+				},
+			},
+			{
+				Content:      GeminiContent{Parts: []GeminiPart{{Text: "result2"}}, Role: "model"},
+				FinishReason: "STOP",
+				GroundingMetadata: &GeminiGroundingMetadata{
+					WebSearchQueries: []string{"query3"},
+				},
+			},
+			{
+				Content:      GeminiContent{Parts: []GeminiPart{{Text: "result3"}}, Role: "model"},
+				FinishReason: "STOP",
+				// No grounding metadata for this candidate
+			},
+		},
+	}
+
+	cost := CalculateGeminiResponseCost(resp, nil)
+	if cost.GroundingCost <= 0 {
+		t.Error("expected grounding cost > 0")
+	}
+
+	// Compare to single-candidate with 3 queries - should be the same cost
+	singleResp := GeminiResponse{
+		ModelVersion:  "gemini-2.5-flash",
+		UsageMetadata: resp.UsageMetadata,
+		Candidates: []GeminiCandidate{
+			{
+				Content:      GeminiContent{Parts: []GeminiPart{{Text: "result"}}, Role: "model"},
+				FinishReason: "STOP",
+				GroundingMetadata: &GeminiGroundingMetadata{
+					WebSearchQueries: []string{"q1", "q2", "q3"},
+				},
+			},
+		},
+	}
+	singleCost := CalculateGeminiResponseCost(singleResp, nil)
+	if !floatEquals(cost.GroundingCost, singleCost.GroundingCost) {
+		t.Errorf("3 queries across candidates should equal 3 queries in one: multi=%f single=%f",
+			cost.GroundingCost, singleCost.GroundingCost)
+	}
+}
+
 func TestParseGeminiResponse_InvalidJSON(t *testing.T) {
 	_, err := ParseGeminiResponse([]byte(`{invalid json`))
 	if err == nil {
@@ -1834,6 +2056,41 @@ func TestDeepCopy_ProviderMetadata(t *testing.T) {
 	}
 	if meta2.Models["gpt-4o"].InputPerMillion != originalPrice {
 		t.Errorf("expected original price %f, got %f", originalPrice, meta2.Models["gpt-4o"].InputPerMillion)
+	}
+}
+
+func TestDeepCopy_SubscriptionTiers(t *testing.T) {
+	original := ProviderPricing{
+		Provider: "test",
+		SubscriptionTiers: map[string]SubscriptionTier{
+			"free":  {Credits: 1000, PriceUSD: 0},
+			"pro":   {Credits: 10000, PriceUSD: 29.99},
+			"elite": {Credits: 100000, PriceUSD: 99.99},
+		},
+		CreditPricing: &CreditPricing{
+			BaseCostPerRequest: 100,
+			Multipliers: CreditMultiplier{
+				JSRendering: 200,
+			},
+		},
+	}
+
+	copied := copyProviderPricing(original)
+
+	if len(copied.SubscriptionTiers) != 3 {
+		t.Errorf("expected 3 tiers, got %d", len(copied.SubscriptionTiers))
+	}
+
+	// Mutate original and verify copy is independent
+	original.SubscriptionTiers["free"] = SubscriptionTier{Credits: 999, PriceUSD: 0}
+	if copied.SubscriptionTiers["free"].Credits != 1000 {
+		t.Error("copy should be independent of original - SubscriptionTiers mutation propagated")
+	}
+
+	// Verify CreditPricing deep copy
+	original.CreditPricing.BaseCostPerRequest = 999
+	if copied.CreditPricing.BaseCostPerRequest != 100 {
+		t.Error("copy should be independent of original - CreditPricing mutation propagated")
 	}
 }
 

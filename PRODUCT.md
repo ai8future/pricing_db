@@ -210,4 +210,4 @@ This library is designed as internal infrastructure for applications that:
 - **300+ models** tracked (including provider-namespaced variants)
 - **4 billing models:** token-based, credit-based, image-based, and grounding/search
 - **~115 test cases** covering calculation logic, prefix matching, discount stacking, tier selection, overflow protection, thread safety, and CLI integration
-- **Version 1.1.0** (actively maintained since January 2026)
+- **Version 1.1.2** (actively maintained since January 2026)

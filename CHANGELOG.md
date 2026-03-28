@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.2] - 2026-03-27
+- Add 12 new unit tests covering previously untested code paths: image prefix matching, js_premium credit multiplier, batch grounding when allowed, ParseGeminiResponseWithOptions batch mode, empty search query filtering, multi-candidate grounding accumulation, SubscriptionTiers deep copy, CLI printJSON/printHuman output, non-pricing file filtering, and empty model string handling
+- Agent: Claude Code (Claude:Opus 4.6)
+
 ## [1.1.1] - 2026-03-26
 - GO-BEST-PRACTICES conformance: Makefile with cross-platform build targets (build-linux, build-darwin, build-all), launcher script, binary naming, LDFLAGS with version injection, CGO_ENABLED=0 static builds
 - Agent: Claude:Opus 4.6
