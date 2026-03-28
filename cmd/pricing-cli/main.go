@@ -50,6 +50,7 @@ func loadConfig() CLIConfig {
 }
 
 func main() {
+	chassis.SetAppVersion(version)
 	chassis.RequireMajor(10)
 
 	d := deploy.Discover("pricing_db")
@@ -78,7 +79,7 @@ func main() {
 	humanFlag := flag.Bool("human", false, "Human-readable output (default: JSON)")
 	modelFlag := flag.String("model", "", "Override model name (when modelVersion missing)")
 	verboseFlag := flag.Bool("v", false, "Verbose output (debug logging)")
-	versionFlag := flag.Bool("version", false, "Print version")
+	// --version is handled by chassis.RequireMajor via SetAppVersion
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: pricing-cli [options]\n\n")
@@ -97,12 +98,6 @@ func main() {
 	}
 
 	flag.Parse()
-
-	// Handle version flag
-	if *versionFlag {
-		fmt.Printf("pricing-cli v%s (chassis %s)\n", version, chassis.Version)
-		os.Exit(0)
-	}
 
 	// Resolve log level: -v flag overrides env config
 	logLevel := cfg.LogLevel
