@@ -19,7 +19,6 @@ import (
 	pricing "github.com/ai8future/pricing_db"
 )
 
-var version = "dev"
 
 // CLIConfig holds environment-based configuration overrides.
 // Flags take precedence over these values when explicitly set.
@@ -50,7 +49,7 @@ func loadConfig() CLIConfig {
 }
 
 func main() {
-	chassis.SetAppVersion(version)
+	chassis.SetAppVersion(pricing.AppVersion)
 	chassis.RequireMajor(10)
 
 	d := deploy.Discover("pricing_db")

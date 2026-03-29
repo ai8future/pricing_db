@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.3] - 2026-03-28
+- Add appversion.go with embedded VERSION for chassis SetAppVersion pattern
+- Update cmd/pricing-cli/main.go: replace `chassis.SetAppVersion(version)` with `chassis.SetAppVersion(pricing.AppVersion)`
+- Remove dead `var version = "dev"` variable
+- Agent: Claude Code (Claude:Opus 4.6)
+
 ## [1.1.2] - 2026-03-27
 - Add 12 new unit tests covering previously untested code paths: image prefix matching, js_premium credit multiplier, batch grounding when allowed, ParseGeminiResponseWithOptions batch mode, empty search query filtering, multi-candidate grounding accumulation, SubscriptionTiers deep copy, CLI printJSON/printHuman output, non-pricing file filtering, and empty model string handling
 - Agent: Claude Code (Claude:Opus 4.6)
