@@ -9,13 +9,12 @@ import (
 	"log"
 	"os"
 
-	chassis "github.com/ai8future/chassis-go/v10"
-	"github.com/ai8future/chassis-go/v10/config"
-	"github.com/ai8future/chassis-go/v10/deploy"
-	"github.com/ai8future/chassis-go/v10/logz"
-	"github.com/ai8future/chassis-go/v10/registry"
-	"github.com/ai8future/chassis-go/v10/secval"
-	"github.com/ai8future/chassis-go/v10/xyops"
+	chassis "github.com/ai8future/chassis-go/v11"
+	"github.com/ai8future/chassis-go/v11/config"
+	"github.com/ai8future/chassis-go/v11/deploy"
+	"github.com/ai8future/chassis-go/v11/logz"
+	"github.com/ai8future/chassis-go/v11/registry"
+	"github.com/ai8future/chassis-go/v11/secval"
 	pricing "github.com/ai8future/pricing_db"
 )
 
@@ -50,7 +49,7 @@ func loadConfig() CLIConfig {
 
 func main() {
 	chassis.SetAppVersion(pricing.AppVersion)
-	chassis.RequireMajor(10)
+	chassis.RequireMajor(11)
 
 	d := deploy.Discover("pricing_db")
 	d.LoadEnv()
@@ -63,14 +62,6 @@ func main() {
 		log.Fatalf("registry: %v", err)
 	}
 	defer registry.ShutdownCLI(0)
-
-	// Create xyops client if configured (no monitoring bridge for CLI)
-	var ops *xyops.Client
-	if os.Getenv("XYOPS_BASE_URL") != "" {
-		xyCfg := config.MustLoad[xyops.Config]()
-		ops = xyops.New(xyCfg)
-	}
-	_ = ops // available for job triggering
 
 	// Define flags
 	fileFlag := flag.String("f", "", "Read JSON from file (default: stdin)")

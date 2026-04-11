@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	chassis "github.com/ai8future/chassis-go/v10"
-	"github.com/ai8future/chassis-go/v10/secval"
-	"github.com/ai8future/chassis-go/v10/testkit"
+	chassis "github.com/ai8future/chassis-go/v11"
+	"github.com/ai8future/chassis-go/v11/secval"
+	"github.com/ai8future/chassis-go/v11/testkit"
 	pricing "github.com/ai8future/pricing_db"
 )
 
 func TestMain(m *testing.M) {
-	chassis.RequireMajor(10)
+	chassis.RequireMajor(11)
 	os.Exit(m.Run())
 }
 
