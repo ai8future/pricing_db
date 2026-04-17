@@ -2,7 +2,7 @@ module github.com/ai8future/pricing_db
 
 go 1.25.5
 
-require github.com/ai8future/chassis-go/v11 v11.0.0
+require github.com/ai8future/chassis-go/v11 v11.1.3
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
