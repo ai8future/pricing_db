@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.4 — 2026-05-13
+- Update dependencies and config
+
 ## [1.1.3] - 2026-03-28
 - Add appversion.go with embedded VERSION for chassis SetAppVersion pattern
 - Update cmd/pricing-cli/main.go: replace `chassis.SetAppVersion(version)` with `chassis.SetAppVersion(pricing.AppVersion)`

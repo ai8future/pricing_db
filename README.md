@@ -34,7 +34,7 @@ All pricing data lives in `configs/*.json` and is compiled into the binary via `
 go get github.com/ai8future/pricing_db
 ```
 
-Requires Go 1.25.5+.
+Requires Go 1.26.2+.
 
 ## Quick Start
 
