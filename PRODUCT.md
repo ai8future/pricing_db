@@ -167,6 +167,26 @@ A command-line interface that parses Gemini API JSON responses from stdin or fil
 
 ---
 
+## How to Think About Code Changes
+
+This is a **single-purpose cost-calculation library**. Its value comes from being correct, deterministic, and dependency-free. Keep these constraints in mind:
+
+1. **Pricing data belongs in `configs/*.json`, never in Go code.** Adding or updating a provider is a data edit (a new or modified `{provider}_pricing.json`), not a code change. The engine discovers configs automatically via `go:embed`. Resist the temptation to hard-code a model's rate in `pricing.go`.
+
+2. **The core library must stay zero-runtime-dependency.** `pricing.go`, `types.go`, `helpers.go`, and `embed.go` use only the Go standard library. The only module dependency (`chassis-go/v11`) exists for shared suite tooling; do not pull provider SDKs, HTTP clients, or database drivers into the cost path. Anything that requires network or disk at runtime does **not** belong here.
+
+3. **Calculation correctness is the product.** Every discount-stacking rule, tier threshold, and rounding behavior encodes a real provider's documented billing. Changing arithmetic in `calculateBatchCacheCosts`, `selectTierLocked`, or `roundToPrecision` can silently shift every downstream cost report. Such changes must be accompanied by tests that pin the expected USD figures.
+
+4. **Preserve graceful degradation.** Unknown models return `Unknown: true` with zero cost; lookups must never panic or error in the hot path. A pricing miss should be a flag for triage, not a production outage.
+
+5. **Maintain backward-compatible public APIs.** This library is imported in-process by sibling services. The package-level functions (`CalculateCost`, `CalculateGeminiCostWithOptions`, `ParseGeminiResponse`, etc.) and the `Cost` / `CostDetails` structs are a contract. Add new fields/functions rather than renaming or removing existing ones.
+
+6. **What belongs in a sibling repo, not here:** usage *metering* and aggregation, billing/invoicing, budget enforcement, dashboards, provider API clients, and any persistence of cost records. This library answers "what does this usage cost right now?" — it does not store, bill, or enforce. Consumers compose those concerns on top of it.
+
+7. **Config edits are validated at init.** New pricing entries are checked at startup (no negatives, no rate above $10,000/million tokens, no batch/cache multiplier > 1.0, valid `batch_cache_rule`, non-negative tier thresholds). If a legitimate price would trip a guard, change the guard deliberately and document why — do not work around it with malformed data.
+
+---
+
 ## Data Architecture Decisions
 
 ### Embedded at Compile Time
@@ -204,10 +224,13 @@ This library is designed as internal infrastructure for applications that:
 
 ---
 
-## Current Scale
+## Current State / Status
 
-- **27 providers** with pricing data
-- **300+ models** tracked (including provider-namespaced variants)
-- **4 billing models:** token-based, credit-based, image-based, and grounding/search
-- **~115 test cases** covering calculation logic, prefix matching, discount stacking, tier selection, overflow protection, thread safety, and CLI integration
-- **Version 1.1.2** (actively maintained since January 2026)
+- **Version 1.1.4** (actively maintained since January 2026). Built atop `chassis-go/v11` (v11.1.8) for shared suite tooling; the core pricing engine itself depends only on the Go standard library.
+- **27 providers** with pricing data: 24 token-based AI providers plus 3 credit-based services (Postmark, Scrapedo, Serper).
+- **300+ model entries** tracked (315 at last count), including provider-namespaced variants and image-model resolution/quality variants.
+- **4 billing models:** token-based, credit-based, image-based, and grounding/search.
+- **140+ test, example, and benchmark functions** (across `pricing_test.go`, `validation_test.go`, `image_test.go`, `example_test.go`, and `benchmark_test.go`) covering calculation logic, prefix matching, discount stacking, tier selection, overflow protection, thread safety, configuration validation, and CLI integration. Coverage profiles are committed (`coverage.out`).
+- **Status: built and in production use** as an embeddable library and CLI. All capabilities described above are implemented; pricing data is refreshed by editing `configs/*.json` and cutting a new version.
+
+This is a **library + CLI**, not a long-running service: there is no server process, port, database, or deployment topology. It is consumed in-process by Go applications and invoked as a one-shot command-line tool. "Scale" is therefore a function of the host application's throughput; the library adds no I/O and is safe under heavy goroutine concurrency.
