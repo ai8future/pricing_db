@@ -471,7 +471,7 @@ pricing_db/
 
 ## Version
 
-Current version: **1.1.2**
+Current version: **1.1.4**
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 
